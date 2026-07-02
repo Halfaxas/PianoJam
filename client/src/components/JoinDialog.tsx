@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AVATARS, randomAvatar, ROOM_LIMITS } from "@pianojam/shared";
 import { getSocket } from "../lib/socket";
+import { randomNickname } from "../lib/names";
 import { useRoomStore } from "../state/roomStore";
 import { getAdminToken, useProfileStore } from "../state/profileStore";
 
@@ -10,13 +11,14 @@ interface Props {
 
 /**
  * Shown before entering a room: pick a nickname and an avatar. A random
- * avatar is preselected, so joining is a single click. If the nickname is
- * already used in the room, the server rejects and we prompt for another.
+ * avatar is preselected on every join, so joining is a single click, and
+ * "Surprise me" generates a nickname. If the nickname is already used in
+ * the room, the server rejects and we prompt for another.
  */
 export function JoinDialog({ roomId }: Props) {
   const profile = useProfileStore();
   const [nickname, setNickname] = useState(profile.nickname);
-  const [avatar, setAvatar] = useState(profile.avatar || randomAvatar());
+  const [avatar, setAvatar] = useState(randomAvatar());
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -56,8 +58,17 @@ export function JoinDialog({ roomId }: Props) {
         <h2>Joining room</h2>
         <p className="hint">Pick a nickname and an avatar for this session.</p>
 
+        <div className="avatar-header">
+          <span>Nickname</span>
+          <button
+            type="button"
+            className="btn ghost"
+            onClick={() => setNickname(randomNickname())}
+          >
+            Surprise me
+          </button>
+        </div>
         <label className="join-nickname">
-          Nickname
           <input
             value={nickname}
             maxLength={ROOM_LIMITS.nicknameMax}
@@ -70,13 +81,6 @@ export function JoinDialog({ roomId }: Props) {
 
         <div className="avatar-header">
           <span>Avatar</span>
-          <button
-            type="button"
-            className="btn ghost"
-            onClick={() => setAvatar(randomAvatar())}
-          >
-            Surprise me
-          </button>
         </div>
         <div className="avatar-grid">
           {AVATARS.map((id) => (

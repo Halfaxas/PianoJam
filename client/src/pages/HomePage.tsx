@@ -76,7 +76,7 @@ function CreateRoomCard() {
               onChange={() => setSoundMode("admin")}
             />
             <span>
-              <b>Admin controlled</b>
+              <b>Solo instrument</b>
               <small>You pick one sound pack and everyone plays with it.</small>
             </span>
           </label>
@@ -146,7 +146,7 @@ function JoinRoomCard() {
                 <span className="room-name">{room.name}</span>
                 <span className="room-meta">
                   #{room.id} · {room.playerCount}/{room.maxPlayers} players ·{" "}
-                  {room.soundMode === "orchestra" ? "orchestra" : "admin sound"}
+                  {room.soundMode === "orchestra" ? "orchestra" : "solo instrument"}
                   {room.chatEnabled ? " · chat" : ""}
                 </span>
               </div>

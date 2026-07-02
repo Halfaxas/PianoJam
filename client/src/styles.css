@@ -11,8 +11,22 @@
   --accent-2: #a78bfa;
   --danger: #f87171;
   --success: #4ade80;
-  --radius: 12px;
+  /*
+   * Radius scale. Every rounded element uses one of these four stops so
+   * corners stay consistent across the app:
+   *   xs   8px  - small inline controls (icon buttons, swatches)
+   *   sm  10px  - buttons and inputs
+   *   md  12px  - rows, option cards, chat bubbles, alerts
+   *   lg  20px  - floating surfaces (cards, modals, drawers, toasts)
+   *   pill      - chips, tags, badges
+   */
+  --radius-xs: 8px;
+  --radius-sm: 10px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
   --shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  --focus-ring: 0 0 0 3px rgba(110, 231, 255, 0.18);
   --font: "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 
@@ -52,7 +66,7 @@ h1, h2, h3 {
   align-items: center;
   gap: 7px;
   padding: 8px 14px;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   border: 1px solid transparent;
   background: transparent;
   font-size: 14px;
@@ -93,6 +107,13 @@ h1, h2, h3 {
 .btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+  transform: none;
+}
+
+.btn:focus-visible,
+.icon-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .btn.full {
@@ -107,7 +128,7 @@ h1, h2, h3 {
   font-size: 16px;
   cursor: pointer;
   padding: 4px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
 }
 
 .icon-btn:hover {
@@ -122,6 +143,42 @@ h1, h2, h3 {
   cursor: pointer;
   font-size: inherit;
   text-decoration: underline;
+}
+
+/* ------------------------------ tooltip ----------------------------- */
+
+/* Hover tooltip that also works around disabled buttons (which swallow
+   mouse events), e.g. the Share button while the room is full. */
+.tooltip-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.tooltip-wrap[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  box-shadow: var(--shadow);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-3px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 60;
+}
+
+.tooltip-wrap[data-tip]:hover::after {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 /* ------------------------------- forms ------------------------------ */
@@ -146,16 +203,18 @@ h1, h2, h3 {
 .form input[type="email"],
 .form input:not([type]) {
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--panel-2);
   color: var(--text);
   font-size: 14px;
   outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .form input:focus {
   border-color: var(--accent);
+  box-shadow: var(--focus-ring);
 }
 
 .checkbox {
@@ -205,7 +264,7 @@ input[type="range"] {
 .tag {
   font-size: 11px;
   padding: 2px 7px;
-  border-radius: 20px;
+  border-radius: var(--radius-pill);
   background: rgba(110, 231, 255, 0.15);
   color: var(--accent);
 }
@@ -215,7 +274,7 @@ input[type="range"] {
   height: 18px;
   padding: 0 5px;
   margin-left: 6px;
-  border-radius: 10px;
+  border-radius: var(--radius-pill);
   background: var(--danger);
   color: #fff;
   font-size: 11px;
@@ -243,7 +302,7 @@ input[type="range"] {
   width: calc(100vw - 32px);
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
   animation: pop-in 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.2);
 }
@@ -288,7 +347,7 @@ input[type="range"] {
 
 .toast {
   padding: 11px 16px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
@@ -350,7 +409,7 @@ input[type="range"] {
   padding: 5px 6px;
   background: var(--panel-2);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
 }
 
 .logo-keys i {
@@ -412,7 +471,7 @@ input[type="range"] {
 .card {
   background: rgba(22, 27, 38, 0.85);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   padding: 24px;
   box-shadow: var(--shadow);
   backdrop-filter: blur(8px);
@@ -439,7 +498,7 @@ input[type="range"] {
   gap: 12px;
   padding: 10px 14px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--panel-2);
 }
 
@@ -470,15 +529,17 @@ input[type="range"] {
 .join-by-id input {
   flex: 1;
   padding: 9px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--panel-2);
   color: var(--text);
   outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .join-by-id input:focus {
   border-color: var(--accent);
+  box-shadow: var(--focus-ring);
 }
 
 .home-footer {
@@ -561,7 +622,7 @@ input[type="range"] {
   font-weight: 700;
   letter-spacing: 0.04em;
   padding: 3px 8px;
-  border-radius: 20px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--border);
   color: var(--text-dim);
 }
@@ -628,7 +689,7 @@ input[type="range"] {
   background: var(--panel);
   border: 1px solid var(--border);
   padding: 8px 16px;
-  border-radius: 30px;
+  border-radius: var(--radius-pill);
   font-size: 13px;
   color: var(--text-dim);
   animation: fade-in 0.3s ease;
@@ -670,7 +731,7 @@ input[type="range"] {
   width: min(340px, calc(100vw - 24px));
   background: rgba(22, 27, 38, 0.92);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
   backdrop-filter: blur(8px);
   display: flex;
@@ -707,7 +768,7 @@ input[type="range"] {
   gap: 1px;
   padding: 7px 11px;
   background: var(--panel-2);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   max-width: 90%;
   align-self: flex-start;
   word-break: break-word;
@@ -750,15 +811,22 @@ input[type="range"] {
 .chat-input input {
   flex: 1;
   padding: 9px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--panel-2);
   color: var(--text);
   outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .chat-input input:focus {
   border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+
+.chat-input input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 /* ------------------------------ keyboard ---------------------------- */
@@ -828,7 +896,7 @@ input[type="range"] {
   width: 100%;
   text-align: left;
   padding: 10px 14px;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   border: 1px solid transparent;
   background: transparent;
   font-size: 14px;
@@ -859,6 +927,42 @@ input[type="range"] {
   gap: 2px;
   max-height: min(430px, 60vh);
   overflow-y: auto;
+}
+
+.list-item-spinner {
+  margin-left: auto;
+}
+
+/* room settings (admin) */
+
+.room-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.settings-player {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 4px;
+}
+
+.settings-player-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.btn.small {
+  padding: 5px 9px;
+  font-size: 13px;
+}
+
+.btn.ghost.active {
+  border-color: var(--danger);
+  background: rgba(248, 113, 113, 0.12);
 }
 
 .player-list {
@@ -958,7 +1062,7 @@ input[type="range"] {
   align-items: center;
   gap: 10px;
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid transparent;
   background: transparent;
   font-size: 14px;
@@ -978,7 +1082,7 @@ input[type="range"] {
 .swatch {
   width: 22px;
   height: 22px;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
@@ -1017,23 +1121,25 @@ input[type="range"] {
 
 .join-nickname input {
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--panel-2);
   color: var(--text);
   font-size: 15px;
   outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .join-nickname input:focus {
   border-color: var(--accent);
+  box-shadow: var(--focus-ring);
 }
 
 .join-error {
   background: rgba(248, 113, 113, 0.12);
   border: 1px solid rgba(248, 113, 113, 0.4);
   color: #fca5a5;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 8px 12px;
   font-size: 13px;
 }
@@ -1055,7 +1161,7 @@ input[type="range"] {
 
 .avatar-option {
   aspect-ratio: 1;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   border: 2px solid transparent;
   background: var(--panel-2);
   cursor: pointer;
@@ -1099,7 +1205,7 @@ input[type="range"] {
   padding: 6px 12px 6px 7px;
   background: rgba(22, 27, 38, 0.78);
   border: 1px solid var(--border);
-  border-radius: 30px;
+  border-radius: var(--radius-pill);
   backdrop-filter: blur(6px);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
@@ -1163,7 +1269,7 @@ input[type="range"] {
   gap: 10px;
   padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--panel-2);
   cursor: pointer;
   transition: border-color 0.12s;

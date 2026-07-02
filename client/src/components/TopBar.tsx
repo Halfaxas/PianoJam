@@ -1,16 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAudioStore } from "../state/audioStore";
-import { useRoomStore } from "../state/roomStore";
+import { useIsAdmin, useRoomStore } from "../state/roomStore";
+import { useUiStore, type PanelId } from "../state/uiStore";
 import { startRecording, stopRecording } from "../audio/recorder";
 import { getInstrument } from "../audio/instruments";
 import { toast } from "../state/toastStore";
 
-export type PanelId = "sound" | "metronome" | "theme" | null;
-
 interface Props {
-  openPanel: PanelId;
-  setOpenPanel: (p: PanelId) => void;
   chatVisible: boolean;
   toggleChat: () => void;
   onRecordingReady: (blob: Blob) => void;
@@ -32,16 +29,23 @@ function RecordingClock({ startedAt }: { startedAt: number }) {
   );
 }
 
-export function TopBar({ openPanel, setOpenPanel, chatVisible, toggleChat, onRecordingReady }: Props) {
+export function TopBar({ chatVisible, toggleChat, onRecordingReady }: Props) {
   const navigate = useNavigate();
   const room = useRoomStore((s) => s.room);
+  const playerCount = useRoomStore((s) => s.players.length);
   const unread = useRoomStore((s) => s.unread);
+  const isAdmin = useIsAdmin();
+  const openPanel = useUiStore((s) => s.openPanel);
+  const setOpenPanel = useUiStore((s) => s.setOpenPanel);
   const instrumentId = useAudioStore((s) => s.instrumentId);
   const instrumentLoading = useAudioStore((s) => s.instrumentLoading);
   const midiDevices = useAudioStore((s) => s.midiDevices);
+  const qwertyOctave = useAudioStore((s) => s.qwertyOctave);
   const pedalDown = useAudioStore((s) => s.pedalDown);
   const recording = useAudioStore((s) => s.recording);
   const recordingStartedAt = useAudioStore((s) => s.recordingStartedAt);
+
+  const roomFull = room !== null && playerCount >= room.maxPlayers;
 
   const toggle = (panel: Exclude<PanelId, null>) =>
     setOpenPanel(openPanel === panel ? null : panel);
@@ -59,6 +63,17 @@ export function TopBar({ openPanel, setOpenPanel, chatVisible, toggleChat, onRec
     }
   };
 
+  const shareRoom = async () => {
+    if (!room) return;
+    const url = `${window.location.origin}/room/${room.id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Room link copied. Send it to a friend!");
+    } catch {
+      toast.error(`Couldn't copy automatically. The link is: ${url}`);
+    }
+  };
+
   return (
     <header className="topbar">
       <div className="topbar-left">
@@ -69,7 +84,7 @@ export function TopBar({ openPanel, setOpenPanel, chatVisible, toggleChat, onRec
           <span className="room-name">{room?.name ?? "..."}</span>
           {room && (
             <span className="room-id">
-              #{room.id} · {room.soundMode === "orchestra" ? "orchestra" : "admin sound"}
+              #{room.id} · {room.soundMode === "orchestra" ? "orchestra" : "solo instrument"}
             </span>
           )}
         </div>
@@ -86,6 +101,11 @@ export function TopBar({ openPanel, setOpenPanel, chatVisible, toggleChat, onRec
         <button className="btn ghost" onClick={() => toggle("theme")}>
           Colors
         </button>
+        {isAdmin && (
+          <button className="btn ghost" onClick={() => toggle("settings")}>
+            ⚙ Settings
+          </button>
+        )}
         <button
           className={`btn ${recording ? "danger" : "ghost"}`}
           onClick={onRecordClick}
@@ -97,6 +117,24 @@ export function TopBar({ openPanel, setOpenPanel, chatVisible, toggleChat, onRec
       </div>
 
       <div className="topbar-right">
+        <span
+          className="tooltip-wrap"
+          data-tip={
+            roomFull
+              ? "The room is full, no one else can join right now"
+              : "Copy an invite link to this room"
+          }
+        >
+          <button className="btn ghost" onClick={shareRoom} disabled={roomFull}>
+            🔗 Share
+          </button>
+        </span>
+        <span
+          className="status-chip"
+          title={`Letter keys play octave ${qwertyOctave} (C${qwertyOctave}-B${qwertyOctave}). Press 0-8 to switch, Shift for sharps.`}
+        >
+          OCT {qwertyOctave}
+        </span>
         <span
           className={`status-chip${midiDevices.length > 0 ? " ok" : ""}`}
           title={

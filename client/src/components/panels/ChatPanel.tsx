@@ -6,6 +6,7 @@ export function ChatPanel() {
   const messages = useRoomStore((s) => s.messages);
   const setChatOpen = useRoomStore((s) => s.setChatOpen);
   const myName = useRoomStore((s) => s.self?.name);
+  const muted = useRoomStore((s) => s.self?.mutedChat ?? false);
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -20,7 +21,7 @@ export function ChatPanel() {
 
   const send = () => {
     const text = draft.trim();
-    if (!text) return;
+    if (!text || muted) return;
     getSocket().emit("chat:send", text);
     setDraft("");
   };
@@ -42,11 +43,12 @@ export function ChatPanel() {
         <input
           value={draft}
           maxLength={500}
-          placeholder="Message the room…"
+          placeholder={muted ? "The admin muted you in chat" : "Message the room…"}
+          disabled={muted}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && send()}
         />
-        <button className="btn primary" onClick={send} disabled={!draft.trim()}>
+        <button className="btn primary" onClick={send} disabled={muted || !draft.trim()}>
           Send
         </button>
       </div>

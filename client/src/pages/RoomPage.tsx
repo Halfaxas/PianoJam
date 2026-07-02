@@ -5,15 +5,17 @@ import { NoteCanvas } from "../components/NoteCanvas";
 import { NoteChordDisplay } from "../components/NoteChordDisplay";
 import { PlayerStrip } from "../components/PlayerStrip";
 import { JoinDialog } from "../components/JoinDialog";
-import { TopBar, type PanelId } from "../components/TopBar";
+import { TopBar } from "../components/TopBar";
 import { Modal } from "../components/Modal";
 import { MetronomePanel } from "../components/panels/MetronomePanel";
 import { SoundPackPanel } from "../components/panels/SoundPackPanel";
 import { ThemePanel } from "../components/panels/ThemePanel";
+import { RoomSettingsPanel } from "../components/panels/RoomSettingsPanel";
 import { ChatPanel } from "../components/panels/ChatPanel";
 import { SaveRecordingPanel } from "../components/panels/SaveRecordingPanel";
 import { getSocket } from "../lib/socket";
-import { useRoomStore } from "../state/roomStore";
+import { useIsAdmin, useRoomStore } from "../state/roomStore";
+import { useUiStore } from "../state/uiStore";
 import { useThemeStore } from "../state/themeStore";
 import { useAudioStore } from "../state/audioStore";
 import { attachQwerty } from "../audio/qwerty";
@@ -30,7 +32,9 @@ export function RoomPage() {
   const background = useThemeStore((s) => s.background);
   const audioReady = useAudioStore((s) => s.audioReady);
 
-  const [openPanel, setOpenPanel] = useState<PanelId>(null);
+  const isAdmin = useIsAdmin();
+  const openPanel = useUiStore((s) => s.openPanel);
+  const setOpenPanel = useUiStore((s) => s.setOpenPanel);
   const [chatVisible, setChatVisible] = useState(false);
   const [pendingRecording, setPendingRecording] = useState<Blob | null>(null);
 
@@ -43,6 +47,7 @@ export function RoomPage() {
       clearTrails();
       stopMetronome();
       useRoomStore.getState().leave();
+      useUiStore.getState().setOpenPanel(null);
     };
   }, [roomId]);
 
@@ -88,8 +93,6 @@ export function RoomPage() {
   return (
     <div className="room-page" style={{ background }} onPointerDown={unlockAudio}>
       <TopBar
-        openPanel={openPanel}
-        setOpenPanel={setOpenPanel}
         chatVisible={chatVisible}
         toggleChat={() => setChatVisible((v) => !v)}
         onRecordingReady={(blob) => setPendingRecording(blob)}
@@ -126,6 +129,11 @@ export function RoomPage() {
       {openPanel === "theme" && (
         <Modal title="Customize colors" onClose={() => setOpenPanel(null)} width={340}>
           <ThemePanel />
+        </Modal>
+      )}
+      {openPanel === "settings" && isAdmin && (
+        <Modal title="Room settings" onClose={() => setOpenPanel(null)}>
+          <RoomSettingsPanel />
         </Modal>
       )}
       {pendingRecording && (

@@ -1,6 +1,7 @@
 import * as Tone from "tone";
 import { create } from "zustand";
 import { ensureAudioStarted } from "./engine";
+import { useAudioStore } from "../state/audioStore";
 
 export const METRONOME_MIN_BPM = 40;
 export const METRONOME_MAX_BPM = 208;
@@ -77,19 +78,42 @@ function scheduleTicks(ctx: AudioContext): void {
   }
 }
 
-export async function startMetronome(): Promise<void> {
+/**
+ * Set when a start arrives before the AudioContext is unlocked (e.g. the
+ * admin starts the metronome for a player who hasn't clicked yet). Ticking
+ * begins on the gesture that unlocks audio.
+ */
+let pendingStart = false;
+
+async function beginTicking(): Promise<void> {
   await ensureAudioStarted();
   const ctx = Tone.getContext().rawContext as AudioContext;
   await loadBuffers(ctx);
-  if (timer) return;
+  if (timer || !useMetronomeStore.getState().running) return;
   beatIndex = 0;
   nextTickTime = ctx.currentTime + 0.05;
-  useMetronomeStore.getState().setRunning(true);
   scheduleTicks(ctx);
   timer = setInterval(() => scheduleTicks(ctx), LOOKAHEAD_MS);
 }
 
+export async function startMetronome(): Promise<void> {
+  useMetronomeStore.getState().setRunning(true);
+  if (Tone.getContext().state !== "running") {
+    pendingStart = true;
+    return;
+  }
+  await beginTicking();
+}
+
+useAudioStore.subscribe((state) => {
+  if (state.audioReady && pendingStart) {
+    pendingStart = false;
+    void beginTicking();
+  }
+});
+
 export function stopMetronome(): void {
+  pendingStart = false;
   if (timer) {
     clearInterval(timer);
     timer = null;

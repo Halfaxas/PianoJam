@@ -33,6 +33,10 @@ export interface Player {
   /** Instrument this player currently plays. */
   instrumentId: string;
   isAdmin: boolean;
+  /** Muted by the admin: chat messages are dropped by the server. */
+  mutedChat: boolean;
+  /** Muted by the admin: notes/pedal are not relayed to the room. */
+  mutedNotes: boolean;
 }
 
 export interface ChatMessage {
@@ -101,6 +105,12 @@ export interface ClientToServerEvents {
   "instrument:set": (instrumentId: string) => void;
   /** Admin only: start the metronome for everyone in the room. */
   "metronome:start": (payload: { bpm: number }) => void;
+  /** Admin only: remove a player from the room. */
+  "room:kick": (playerId: string) => void;
+  /** Admin only: mute or unmute a player's chat and/or playing. */
+  "room:mute": (payload: { playerId: string; chat: boolean; notes: boolean }) => void;
+  /** Admin only: switch the room's sound mode. */
+  "room:setMode": (mode: SoundMode) => void;
 }
 
 export interface ServerToClientEvents {
@@ -113,6 +123,12 @@ export interface ServerToClientEvents {
   "chat:message": (message: ChatMessage) => void;
   /** The admin started a synchronized metronome. */
   "metronome:start": (payload: { bpm: number; from: string }) => void;
+  /** Room settings changed (e.g. the admin switched the sound mode). */
+  "room:update": (room: RoomSummary) => void;
+  /** You were removed from the room by the admin. */
+  "room:kicked": (payload: { reason: string }) => void;
+  /** Your mute state changed (sent only to the affected player). */
+  "room:muted": (payload: { chat: boolean; notes: boolean }) => void;
 }
 
 export const ROOM_LIMITS = {

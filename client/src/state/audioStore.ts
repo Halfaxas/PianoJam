@@ -7,6 +7,8 @@ interface AudioState {
   instrumentLoading: boolean;
   /** True once the AudioContext has been unlocked by a user gesture. */
   audioReady: boolean;
+  /** Octave the computer-keyboard letters play in (number keys switch it). */
+  qwertyOctave: number;
   midiSupported: boolean;
   midiDevices: string[];
   pedalDown: boolean;
@@ -20,6 +22,7 @@ export const useAudioStore = create<AudioState>((set) => ({
   instrumentId: DEFAULT_INSTRUMENT_ID,
   instrumentLoading: false,
   audioReady: false,
+  qwertyOctave: 4,
   midiSupported: false,
   midiDevices: [],
   pedalDown: false,

@@ -27,7 +27,6 @@ export function SoundPackPanel() {
             : "You are the admin: the sound pack you pick applies to everyone in the room."
           : "Orchestra room: everyone picks their own instrument."}
       </div>
-      {loading && <div className="hint">Loading samples...</div>}
       <div className="soundpack-list">
         {INSTRUMENTS.map((inst) => (
           <button
@@ -37,6 +36,9 @@ export function SoundPackPanel() {
             onClick={() => void pick(inst.id)}
           >
             {inst.label}
+            {loading && inst.id === instrumentId && (
+              <span className="spinner list-item-spinner" title="Loading samples" />
+            )}
           </button>
         ))}
       </div>

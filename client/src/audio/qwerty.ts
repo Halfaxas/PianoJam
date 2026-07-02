@@ -1,20 +1,42 @@
 import { pressKey, releaseKey, setPedal } from "./player";
 import { ensureAudioStarted } from "./engine";
+import { useAudioStore } from "../state/audioStore";
 
 /**
- * Computer-keyboard playing: two octaves centred on middle C, in the layout
- * most virtual pianos use. Space bar acts as the sustain pedal.
- *
- *   Q2W3ER5T6Y7U I9O0P  -> C5 .. E6
- *   ZSXDCVGBHNJM ,L.;/  -> C4 .. E5
+ * Computer-keyboard playing: each letter plays its note (c -> C, d -> D ...)
+ * and Shift plays the sharp (Shift+c -> C#). E and B have no sharp, so
+ * Shift plays the natural. Number keys 0-8 switch the octave the letters
+ * play in (4 = middle, the default); notes outside the 88-key range stay
+ * silent. Space bar acts as the sustain pedal.
  */
 
-const KEY_TO_MIDI: Record<string, number> = {
-  z: 60, s: 61, x: 62, d: 63, c: 64, v: 65, g: 66, b: 67, h: 68, n: 69,
-  j: 70, m: 71, ",": 72, l: 73, ".": 74, ";": 75, "/": 76,
-  q: 72, "2": 73, w: 74, "3": 75, e: 76, r: 77, "5": 78, t: 79, "6": 80,
-  y: 81, "7": 82, u: 83, i: 84, "9": 85, o: 86, "0": 87, p: 88,
+const NOTE_OFFSET: Record<string, number> = {
+  c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11,
 };
+
+const SHARPABLE = new Set(["c", "d", "f", "g", "a"]);
+
+/**
+ * Physical key -> the midi it struck. Releasing Shift before the letter
+ * must still release the sharp that was pressed, so releases are looked up
+ * by e.code instead of re-deriving the note from the current modifiers.
+ */
+const downByCode = new Map<string, number>();
+
+function midiFor(e: KeyboardEvent): number | undefined {
+  const letter = e.code.startsWith("Key") ? e.code.slice(3).toLowerCase() : "";
+  const offset = NOTE_OFFSET[letter];
+  if (offset === undefined) return undefined;
+  const octave = useAudioStore.getState().qwertyOctave;
+  const midi = 12 * (octave + 1) + offset;
+  return e.shiftKey && SHARPABLE.has(letter) ? midi + 1 : midi;
+}
+
+/** Digit0-Digit8 (top row or numpad) -> octave, or null for other keys. */
+function octaveFor(code: string): number | null {
+  const match = /^(?:Digit|Numpad)([0-8])$/.exec(code);
+  return match ? Number(match[1]) : null;
+}
 
 function isTypingTarget(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
@@ -28,8 +50,14 @@ function onKeyDown(e: KeyboardEvent): void {
     setPedal(true);
     return;
   }
-  const midi = KEY_TO_MIDI[e.key.toLowerCase()];
-  if (midi !== undefined) {
+  const octave = octaveFor(e.code);
+  if (octave !== null) {
+    useAudioStore.getState().set({ qwertyOctave: octave });
+    return;
+  }
+  const midi = midiFor(e);
+  if (midi !== undefined && !downByCode.has(e.code)) {
+    downByCode.set(e.code, midi);
     void ensureAudioStarted().catch(() => {});
     pressKey(midi);
   }
@@ -41,8 +69,11 @@ function onKeyUp(e: KeyboardEvent): void {
     setPedal(false);
     return;
   }
-  const midi = KEY_TO_MIDI[e.key.toLowerCase()];
-  if (midi !== undefined) releaseKey(midi);
+  const midi = downByCode.get(e.code);
+  if (midi !== undefined) {
+    downByCode.delete(e.code);
+    releaseKey(midi);
+  }
 }
 
 export function attachQwerty(): () => void {

@@ -6,6 +6,7 @@ import type {
 } from "@pianojam/shared";
 import { isValidAvatar, isValidMidi, randomAvatar, ROOM_LIMITS } from "@pianojam/shared";
 import { RoomManager } from "./rooms";
+import { censorProfanity, containsLink, hasProfanity } from "./profanity";
 
 interface SocketData {
   roomId: string | null;
@@ -85,6 +86,20 @@ export function setupSockets(io: IoServer): void {
           code: "INVALID",
         });
       }
+      if (hasProfanity(nickname)) {
+        return ack({
+          ok: false,
+          error: "That nickname is not allowed. Please pick a friendlier one.",
+          code: "INVALID",
+        });
+      }
+      if (containsLink(nickname)) {
+        return ack({
+          ok: false,
+          error: "Links are not allowed in nicknames.",
+          code: "INVALID",
+        });
+      }
       const avatar = isValidAvatar(input?.avatar) ? input.avatar : randomAvatar();
 
       leaveCurrentRoom();
@@ -142,7 +157,7 @@ export function setupSockets(io: IoServer): void {
     socket.on("note:on", ({ midi, velocity } = {} as never) => {
       const roomId = socket.data.roomId;
       const player = socket.data.player;
-      if (!roomId || !player || !isValidMidi(midi)) return;
+      if (!roomId || !player || player.mutedNotes || !isValidMidi(midi)) return;
       const v = Math.min(1, Math.max(0, Number(velocity) || 0));
       socket.to(roomId).emit("peer:note:on", { midi, velocity: v, from: player.name });
     });
@@ -150,30 +165,80 @@ export function setupSockets(io: IoServer): void {
     socket.on("note:off", ({ midi } = {} as never) => {
       const roomId = socket.data.roomId;
       const player = socket.data.player;
-      if (!roomId || !player || !isValidMidi(midi)) return;
+      if (!roomId || !player || player.mutedNotes || !isValidMidi(midi)) return;
       socket.to(roomId).emit("peer:note:off", { midi, from: player.name });
     });
 
     socket.on("pedal", ({ down } = {} as never) => {
       const roomId = socket.data.roomId;
       const player = socket.data.player;
-      if (!roomId || !player) return;
+      if (!roomId || !player || player.mutedNotes) return;
       socket.to(roomId).emit("peer:pedal", { down: Boolean(down), from: player.name });
     });
 
     socket.on("chat:send", (text) => {
       const roomId = socket.data.roomId;
       const player = socket.data.player;
-      if (!roomId || !player || typeof text !== "string") return;
+      if (!roomId || !player || player.mutedChat || typeof text !== "string") return;
       const room = rooms.get(roomId);
       if (!room?.settings.chatEnabled) return;
       const trimmed = text.trim().slice(0, ROOM_LIMITS.chatMessageMax);
       if (!trimmed) return;
+      if (containsLink(trimmed)) {
+        // Only the sender sees why their message did not appear.
+        socket.emit("chat:message", {
+          from: "PianoJam",
+          text: "Links are not allowed in chat, so your message was not sent.",
+          ts: Date.now(),
+        });
+        return;
+      }
       io.to(roomId).emit("chat:message", {
         from: player.name,
-        text: trimmed,
+        text: censorProfanity(trimmed),
         ts: Date.now(),
       });
+    });
+
+    socket.on("room:kick", (playerId) => {
+      const roomId = socket.data.roomId;
+      if (!roomId || typeof playerId !== "string") return;
+      const kicked = rooms.kick(roomId, socket.id, playerId);
+      if (!kicked) return;
+      const target = io.sockets.sockets.get(playerId);
+      if (target) {
+        target.emit("room:kicked", { reason: "The room admin removed you from the room." });
+        target.leave(roomId);
+        target.data.roomId = null;
+        target.data.player = null;
+      }
+      broadcastPlayers(roomId);
+    });
+
+    socket.on("room:mute", ({ playerId, chat, notes } = {} as never) => {
+      const roomId = socket.data.roomId;
+      if (!roomId || typeof playerId !== "string") return;
+      const target = rooms.setMute(roomId, socket.id, playerId, {
+        chat: Boolean(chat),
+        notes: Boolean(notes),
+      });
+      if (!target) return;
+      io.sockets.sockets
+        .get(playerId)
+        ?.emit("room:muted", { chat: target.mutedChat, notes: target.mutedNotes });
+      broadcastPlayers(roomId);
+    });
+
+    socket.on("room:setMode", (mode) => {
+      const roomId = socket.data.roomId;
+      if (!roomId || (mode !== "admin" && mode !== "orchestra")) return;
+      const change = rooms.setMode(roomId, socket.id, mode);
+      if (!change) return;
+      io.to(roomId).emit("room:update", rooms.summarize(change.room));
+      if (change.instrumentForced) {
+        io.to(roomId).emit("room:instrument", { instrumentId: change.room.instrumentId });
+      }
+      broadcastPlayers(roomId);
     });
 
     socket.on("disconnect", leaveCurrentRoom);

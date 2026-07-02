@@ -141,6 +141,8 @@ export class RoomManager {
       instrumentId:
         room.settings.soundMode === "admin" ? room.instrumentId : DEFAULT_ROOM_INSTRUMENT,
       isAdmin,
+      mutedChat: false,
+      mutedNotes: false,
     };
 
     if (room.deleteTimer) {
@@ -193,6 +195,58 @@ export class RoomManager {
 
     player.instrumentId = instrumentId;
     return { scope: "player", room };
+  }
+
+  /**
+   * Admin kicks another player. Returns the kicked player, or null when the
+   * request is not allowed (not admin, unknown target, or self-kick).
+   */
+  kick(roomId: string, adminId: string, targetId: string): Player | null {
+    const room = this.rooms.get(roomId);
+    const admin = room?.players.get(adminId);
+    const target = room?.players.get(targetId);
+    if (!room || !admin?.isAdmin || !target || targetId === adminId) return null;
+    room.players.delete(targetId);
+    if (room.players.size === 0) this.scheduleDeletion(room);
+    return target;
+  }
+
+  /** Admin mutes/unmutes a player's chat and/or playing. */
+  setMute(
+    roomId: string,
+    adminId: string,
+    targetId: string,
+    mute: { chat: boolean; notes: boolean },
+  ): Player | null {
+    const room = this.rooms.get(roomId);
+    const admin = room?.players.get(adminId);
+    const target = room?.players.get(targetId);
+    if (!room || !admin?.isAdmin || !target || targetId === adminId) return null;
+    target.mutedChat = mute.chat;
+    target.mutedNotes = mute.notes;
+    return target;
+  }
+
+  /**
+   * Admin switches the room's sound mode. Leaving orchestra mode forces
+   * every player onto the instrument the admin has selected at that moment.
+   * Returns whether an instrument change must be broadcast.
+   */
+  setMode(
+    roomId: string,
+    adminId: string,
+    mode: SoundMode,
+  ): { room: Room; instrumentForced: boolean } | null {
+    const room = this.rooms.get(roomId);
+    const admin = room?.players.get(adminId);
+    if (!room || !admin?.isAdmin || room.settings.soundMode === mode) return null;
+    room.settings.soundMode = mode;
+    if (mode === "admin") {
+      room.instrumentId = admin.instrumentId;
+      for (const p of room.players.values()) p.instrumentId = admin.instrumentId;
+      return { room, instrumentForced: true };
+    }
+    return { room, instrumentForced: false };
   }
 
   list(): RoomSummary[] {

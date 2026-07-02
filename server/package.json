@@ -12,6 +12,7 @@
     "@pianojam/shared": "*",
     "cors": "^2.8.5",
     "express": "^5.1.0",
+    "obscenity": "^0.4.6",
     "socket.io": "^4.8.1",
     "tsx": "^4.19.3"
   },

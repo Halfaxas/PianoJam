@@ -14,6 +14,7 @@ interface RoomState {
   unread: number;
   setJoined: (room: RoomSummary, players: Player[], self: Player) => void;
   setError: (error: string) => void;
+  setRoom: (room: RoomSummary) => void;
   setPlayers: (players: Player[]) => void;
   setRoomInstrument: (instrumentId: string) => void;
   addMessage: (message: ChatMessage) => void;
@@ -48,6 +49,7 @@ export const useRoomStore = create<RoomState>((set) => ({
       unread: 0,
     }),
   setError: (error) => set({ status: "error", error }),
+  setRoom: (room) => set({ room }),
   // Keep `self` in sync: admin promotion or instrument changes arrive here.
   setPlayers: (players) =>
     set((s) => ({
