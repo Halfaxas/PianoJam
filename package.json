@@ -1,0 +1,23 @@
+{
+  "name": "pianojam",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Real-time collaborative piano in the browser — rooms, MIDI, 21 sound packs, chat, metronome and audio recording.",
+  "workspaces": [
+    "shared",
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,magenta \"npm:dev -w server\" \"npm:dev -w client\"",
+    "build": "npm run build -w client",
+    "start": "npm run start -w server",
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w client"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "engines": {
+    "node": ">=22.5"
+  }
+}
