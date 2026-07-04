@@ -186,7 +186,7 @@ h1, h2, h3 {
 .form {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: clamp(9px, 1.7vh, 14px);
 }
 
 .form label {
@@ -383,7 +383,7 @@ input[type="range"] {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px clamp(16px, 5vw, 56px);
+  padding: clamp(10px, 2vh, 18px) clamp(16px, 5vw, 56px);
 }
 
 .logo {
@@ -436,14 +436,15 @@ input[type="range"] {
 
 .hero {
   text-align: center;
-  padding: clamp(24px, 6vh, 64px) 20px 12px;
+  padding: clamp(12px, 4vh, 56px) 20px clamp(6px, 1.5vh, 12px);
   max-width: 720px;
   margin: 0 auto;
 }
 
 .hero h1 {
-  font-size: clamp(32px, 5vw, 52px);
-  margin-bottom: 14px;
+  /* Scales with height too, so short 16:9 screens fit without scrolling. */
+  font-size: clamp(28px, min(5vw, 6vh), 52px);
+  margin-bottom: clamp(8px, 1.6vh, 14px);
 }
 
 .hero em {
@@ -456,7 +457,7 @@ input[type="range"] {
 
 .hero p {
   color: var(--text-dim);
-  font-size: clamp(14px, 1.6vw, 17px);
+  font-size: clamp(13px, min(1.6vw, 2.2vh), 17px);
   line-height: 1.6;
 }
 
@@ -464,29 +465,29 @@ input[type="range"] {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 460px));
   justify-content: center;
-  gap: 24px;
-  padding: 32px clamp(16px, 5vw, 56px) 24px;
+  gap: clamp(14px, 2vw, 24px);
+  padding: clamp(14px, 3vh, 32px) clamp(16px, 5vw, 56px) clamp(10px, 2vh, 24px);
 }
 
 .card {
   background: rgba(22, 27, 38, 0.85);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 24px;
+  padding: clamp(16px, 2.6vh, 24px) 24px;
   box-shadow: var(--shadow);
   backdrop-filter: blur(8px);
 }
 
 .card h2 {
   font-size: 19px;
-  margin-bottom: 16px;
+  margin-bottom: clamp(10px, 1.8vh, 16px);
 }
 
 .room-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 260px;
+  max-height: clamp(120px, 26vh, 260px);
   overflow-y: auto;
   margin-bottom: 14px;
 }
@@ -546,7 +547,7 @@ input[type="range"] {
   text-align: center;
   color: var(--text-dim);
   font-size: 13px;
-  padding: 12px 20px 40px;
+  padding: 8px 20px clamp(12px, 3vh, 40px);
 }
 
 .page-center {
@@ -573,6 +574,42 @@ input[type="range"] {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /*
+   * Scrollbar tint derived from the player's chosen background color
+   * (--scroll-thumb, set inline by RoomPage). Backgrounds are usually very
+   * dark, so the color is lifted toward a light gray to stay visible while
+   * keeping the background's hue.
+   */
+  --scroll-thumb-tint: color-mix(in srgb, var(--scroll-thumb, var(--border)) 55%, #9aa3b5);
+}
+
+.room-page .soundpack-list,
+.room-page .chat-messages,
+.room-page .player-list {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb-tint) transparent;
+}
+
+/* Safari has no scrollbar-color; browsers with it ignore these rules. */
+.room-page .soundpack-list::-webkit-scrollbar,
+.room-page .chat-messages::-webkit-scrollbar,
+.room-page .player-list::-webkit-scrollbar {
+  width: 10px;
+}
+
+.room-page .soundpack-list::-webkit-scrollbar-track,
+.room-page .chat-messages::-webkit-scrollbar-track,
+.room-page .player-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.room-page .soundpack-list::-webkit-scrollbar-thumb,
+.room-page .chat-messages::-webkit-scrollbar-thumb,
+.room-page .player-list::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb-tint);
+  border-radius: var(--radius-pill);
+  border: 3px solid transparent;
+  background-clip: padding-box;
 }
 
 .topbar {
@@ -1155,7 +1192,8 @@ input[type="range"] {
 
 .avatar-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+  /* 28 avatars on 7 columns: always four complete rows. */
+  grid-template-columns: repeat(7, 1fr);
   gap: 6px;
 }
 
@@ -1267,7 +1305,7 @@ input[type="range"] {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 10px 12px;
+  padding: clamp(7px, 1.4vh, 10px) 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--panel-2);

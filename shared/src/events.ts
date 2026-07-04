@@ -145,7 +145,7 @@ export const AVATARS = [
   "fox", "dog", "cat", "mouse", "hamster", "rabbit", "bear", "panda",
   "koala", "tiger", "lion", "cow", "pig", "frog", "monkey", "chick",
   "penguin", "duck", "owl", "unicorn", "bee", "butterfly", "octopus",
-  "whale", "turtle", "dragon",
+  "whale", "turtle", "dragon", "wolf", "dolphin",
 ] as const;
 
 export type AvatarId = (typeof AVATARS)[number];

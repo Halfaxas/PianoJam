@@ -91,7 +91,11 @@ export function RoomPage() {
   }
 
   return (
-    <div className="room-page" style={{ background }} onPointerDown={unlockAudio}>
+    <div
+      className="room-page"
+      style={{ background, "--scroll-thumb": background } as React.CSSProperties}
+      onPointerDown={unlockAudio}
+    >
       <TopBar
         chatVisible={chatVisible}
         toggleChat={() => setChatVisible((v) => !v)}

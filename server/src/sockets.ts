@@ -59,8 +59,15 @@ export function setupSockets(io: IoServer): void {
 
     socket.on("room:create", (input, ack) => {
       if (typeof ack !== "function") return;
+      const name = String(input?.name ?? "");
+      if (hasProfanity(name)) {
+        return ack({ ok: false, error: "That room name is not allowed. Please pick a friendlier one." });
+      }
+      if (containsLink(name)) {
+        return ack({ ok: false, error: "Links are not allowed in room names." });
+      }
       const result = rooms.create({
-        name: String(input?.name ?? ""),
+        name,
         maxPlayers: Number(input?.maxPlayers),
         chatEnabled: Boolean(input?.chatEnabled),
         soundMode: input?.soundMode === "orchestra" ? "orchestra" : "admin",

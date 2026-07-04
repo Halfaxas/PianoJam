@@ -9,7 +9,6 @@ interface ActiveNotesState {
   holders: Map<number, Set<string>>;
   press: (midi: number, owner: string) => void;
   release: (midi: number, owner: string) => void;
-  releaseAllFrom: (owner: string) => void;
   clear: () => void;
 }
 
@@ -34,21 +33,6 @@ export const useActiveNotes = create<ActiveNotesState>((set) => ({
       next.delete(owner);
       if (next.size === 0) holders.delete(midi);
       else holders.set(midi, next);
-      return { holders };
-    }),
-
-  releaseAllFrom: (owner) =>
-    set((state) => {
-      const holders = new Map<number, Set<string>>();
-      for (const [midi, owners] of state.holders) {
-        if (!owners.has(owner)) {
-          holders.set(midi, owners);
-        } else {
-          const next = new Set(owners);
-          next.delete(owner);
-          if (next.size > 0) holders.set(midi, next);
-        }
-      }
       return { holders };
     }),
 

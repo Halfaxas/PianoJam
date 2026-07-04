@@ -63,14 +63,12 @@ export function setPedal(down: boolean): void {
 export function remoteNoteOn(midi: number, velocity: number, from: string): void {
   if (!isValidMidi(midi)) return;
   engine.noteOn(midi, velocity, from, peerInstrument(from));
-  useActiveNotes.getState().press(midi, from);
   trailStart(midi, from, trailColor(midi), true);
 }
 
 export function remoteNoteOff(midi: number, from: string): void {
   if (!isValidMidi(midi)) return;
   engine.noteOff(midi, from);
-  useActiveNotes.getState().release(midi, from);
   trailEnd(midi, from);
 }
 
@@ -81,6 +79,5 @@ export function remotePedal(down: boolean, from: string): void {
 /** Called when a peer disconnects so nothing is left ringing or lit. */
 export function remotePlayerGone(name: string): void {
   engine.releaseAllFor(name);
-  useActiveNotes.getState().releaseAllFrom(name);
   endAllFrom(name);
 }
