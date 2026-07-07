@@ -8,16 +8,24 @@ interface RoomState {
   room: RoomSummary | null;
   players: Player[];
   self: Player | null;
+  /** Current invite token for this room (any member can share the link). */
+  inviteToken: string | null;
   error: string | null;
   messages: ChatMessage[];
   chatOpen: boolean;
   unread: number;
-  setJoined: (room: RoomSummary, players: Player[], self: Player) => void;
+  setJoined: (
+    room: RoomSummary,
+    players: Player[],
+    self: Player,
+    inviteToken: string,
+  ) => void;
   setError: (error: string) => void;
   setRoom: (room: RoomSummary) => void;
   setPlayers: (players: Player[]) => void;
   setRoomInstrument: (instrumentId: string) => void;
-  addMessage: (message: ChatMessage) => void;
+  setInviteToken: (inviteToken: string) => void;
+  addMessage: (message: ChatMessage, countUnread?: boolean) => void;
   setChatOpen: (open: boolean) => void;
   leave: () => void;
 }
@@ -27,17 +35,19 @@ export const useRoomStore = create<RoomState>((set) => ({
   room: null,
   players: [],
   self: null,
+  inviteToken: null,
   error: null,
   messages: [],
   chatOpen: false,
   unread: 0,
 
-  setJoined: (room, players, self) =>
+  setJoined: (room, players, self, inviteToken) =>
     set({
       status: "joined",
       room,
       players,
       self,
+      inviteToken,
       error: null,
       messages: [
         {
@@ -58,10 +68,12 @@ export const useRoomStore = create<RoomState>((set) => ({
     })),
   setRoomInstrument: (instrumentId) =>
     set((s) => ({ room: s.room ? { ...s.room, instrumentId } : s.room })),
-  addMessage: (message) =>
+  setInviteToken: (inviteToken) => set({ inviteToken }),
+  // countUnread=false keeps locally muted senders from raising the badge.
+  addMessage: (message, countUnread = true) =>
     set((s) => ({
       messages: [...s.messages.slice(-199), message],
-      unread: s.chatOpen ? 0 : s.unread + 1,
+      unread: s.chatOpen ? 0 : countUnread ? s.unread + 1 : s.unread,
     })),
   setChatOpen: (open) => set((s) => ({ chatOpen: open, unread: open ? 0 : s.unread })),
   leave: () =>
@@ -70,6 +82,7 @@ export const useRoomStore = create<RoomState>((set) => ({
       room: null,
       players: [],
       self: null,
+      inviteToken: null,
       error: null,
       messages: [],
       chatOpen: false,

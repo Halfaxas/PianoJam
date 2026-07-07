@@ -154,6 +154,11 @@ h1, h2, h3 {
   display: inline-flex;
 }
 
+/* Wraps a full-width control without shrinking it. */
+.tooltip-wrap.block {
+  display: flex;
+}
+
 .tooltip-wrap[data-tip]::after {
   content: attr(data-tip);
   position: absolute;
@@ -718,9 +723,68 @@ input[type="range"] {
   height: 100%;
 }
 
+/* Live score card during Keep Up and solo practice. */
+.song-hud {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 7px 18px;
+  background: rgba(22, 27, 38, 0.82);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow);
+  z-index: 6;
+  pointer-events: none;
+  animation: fade-in 0.3s ease;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.song-hud-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.song-hud-acc {
+  font-size: 21px;
+  font-weight: 750;
+  color: var(--accent);
+}
+
+.song-hud-stats {
+  display: flex;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.song-hud-good {
+  color: #4ade80;
+}
+
+.song-hud-mid {
+  color: #fbbf24;
+}
+
+.song-hud-bad {
+  color: #f87171;
+}
+
+.song-hud-streak {
+  color: #f59e0b;
+}
+
 .audio-hint {
   position: absolute;
-  top: 16px;
+  top: 64px;
   left: 50%;
   transform: translateX(-50%);
   background: var(--panel);
@@ -922,6 +986,61 @@ input[type="range"] {
 
 .piano-key.active .key-label {
   color: rgba(0, 0, 0, 0.55);
+}
+
+/* Song practice: live key verdicts (green = correct, red = wrong or held
+   past the note's end). These win over the theme tint because practice
+   keys skip the inline active background. */
+
+.piano-key.white.practice-correct {
+  background: linear-gradient(180deg, #d1fae5 0%, #6ee7a0 40%, #22c55e 100%);
+  border-color: #15803d;
+  box-shadow:
+    0 0 16px rgba(74, 222, 128, 0.6),
+    inset 0 -4px 8px rgba(0, 0, 0, 0.18);
+}
+
+.piano-key.black.practice-correct {
+  background: linear-gradient(180deg, #4ade80 0%, #16a34a 35%, #14532d 100%);
+  box-shadow:
+    0 0 16px rgba(74, 222, 128, 0.65),
+    0 4px 6px rgba(0, 0, 0, 0.55);
+}
+
+.piano-key.white.practice-wrong,
+.piano-key.white.practice-overheld {
+  background: linear-gradient(180deg, #fee2e2 0%, #fb8f8f 40%, #dc2626 100%);
+  border-color: #b91c1c;
+  box-shadow:
+    0 0 16px rgba(248, 113, 113, 0.6),
+    inset 0 -4px 8px rgba(0, 0, 0, 0.18);
+}
+
+.piano-key.black.practice-wrong,
+.piano-key.black.practice-overheld {
+  background: linear-gradient(180deg, #f87171 0%, #b91c1c 35%, #5f1212 100%);
+  box-shadow:
+    0 0 16px rgba(248, 113, 113, 0.65),
+    0 4px 6px rgba(0, 0, 0, 0.55);
+}
+
+.piano-key.practice-overheld {
+  animation: practice-overheld 0.45s ease-in-out infinite alternate;
+}
+
+@keyframes practice-overheld {
+  from {
+    filter: brightness(0.95);
+  }
+  to {
+    filter: brightness(1.4);
+  }
+}
+
+.piano-key.practice-correct .key-label,
+.piano-key.practice-wrong .key-label,
+.piano-key.practice-overheld .key-label {
+  color: rgba(0, 0, 0, 0.6);
 }
 
 /* ------------------------------ panels ------------------------------ */
@@ -1281,6 +1400,267 @@ input[type="range"] {
   font-size: 12px;
 }
 
+.player-chip-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chip-menu-btn {
+  font-size: 14px;
+  padding: 2px 6px;
+  margin-left: 2px;
+}
+
+.local-mute-mark {
+  font-size: 11px;
+}
+
+/* Local-only mute controls, expanded under a player's chip. */
+.mute-menu {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 7px 10px;
+  background: rgba(22, 27, 38, 0.9);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  backdrop-filter: blur(6px);
+  animation: fade-in 0.12s ease;
+}
+
+.mute-menu-hint {
+  flex-basis: 100%;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.strip-mute-all {
+  align-self: flex-start;
+  background: rgba(22, 27, 38, 0.78);
+  border-radius: var(--radius-pill);
+}
+
+/* ----------------------------- song mode ---------------------------- */
+
+.song-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.song-current {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.song-current-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.song-title {
+  font-weight: 650;
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.song-picker,
+.song-transport,
+.song-solo,
+.song-display {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.song-transport,
+.song-solo,
+.song-display {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+
+.song-loaded-badge {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(110, 231, 255, 0.16);
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.song-transport label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-dim);
+  font-weight: 550;
+}
+
+.transport-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.song-time {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.solo-stats {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  font-size: 15px;
+}
+
+.solo-stats b {
+  font-size: 22px;
+  color: var(--accent);
+}
+
+.score-chip {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  background: rgba(245, 192, 74, 0.16);
+  color: #f5c04a;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.song-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.summary-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: var(--radius-md);
+  background: var(--panel-2);
+}
+
+.summary-row.mine {
+  border: 1px solid rgba(110, 231, 255, 0.35);
+}
+
+.summary-rank {
+  width: 26px;
+  text-align: center;
+}
+
+.summary-row .player-avatar {
+  width: 24px;
+  height: 24px;
+  padding: 3px;
+}
+
+.summary-name {
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summary-detail {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.summary-accuracy {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ----------------------------- reactions ---------------------------- */
+
+.reaction-bar {
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  display: flex;
+  gap: 4px;
+  padding: 5px 7px;
+  background: rgba(22, 27, 38, 0.78);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  backdrop-filter: blur(6px);
+  z-index: 5;
+}
+
+.reaction-btn {
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  line-height: 1;
+  padding: 5px 6px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.08s, background 0.12s;
+}
+
+.reaction-btn:hover:enabled {
+  transform: scale(1.2);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.reaction-bar.cooldown .reaction-btn {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.player-chip-wrap {
+  position: relative;
+}
+
+.floating-reaction {
+  position: absolute;
+  top: -6px;
+  font-size: 22px;
+  pointer-events: none;
+  z-index: 6;
+  animation: reaction-float 2.6s ease-out forwards;
+}
+
+@keyframes reaction-float {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.6);
+  }
+  12% {
+    opacity: 1;
+    transform: translateY(-6px) scale(1.15);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-46px) scale(1);
+  }
+}
+
 .player-chip-instrument {
   font-size: 11px;
   color: var(--text-dim);
@@ -1337,6 +1717,42 @@ input[type="range"] {
   font-size: 12px;
   color: var(--text-dim);
   line-height: 1.4;
+}
+
+/* Compact three-way choice (e.g. room visibility). */
+.segmented {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+}
+
+.segment {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.segment:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.segment.selected {
+  background: rgba(110, 231, 255, 0.12);
+  border-color: rgba(110, 231, 255, 0.35);
+  color: var(--accent);
+}
+
+.room-row .lock {
+  font-size: 12px;
 }
 
 .soundpack-panel {

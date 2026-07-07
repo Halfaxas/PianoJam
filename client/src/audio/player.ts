@@ -5,6 +5,8 @@ import { useActiveNotes } from "../state/activeNotes";
 import { useRoomStore } from "../state/roomStore";
 import { useThemeStore } from "../state/themeStore";
 import { useAudioStore } from "../state/audioStore";
+import { localMuteOf } from "../state/localMuteStore";
+import { songLocalPress, songLocalRelease, songVisualsActive } from "../song/engine";
 import { getSocket } from "../lib/socket";
 
 /**
@@ -39,7 +41,9 @@ export function pressKey(midi: number, velocity = 0.8): void {
   locallyDown.add(midi);
   engine.noteOn(midi, velocity, LOCAL, useAudioStore.getState().instrumentId);
   useActiveNotes.getState().press(midi, LOCAL);
-  trailStart(midi, LOCAL, trailColor(midi), false);
+  // No rising trails while song notes are falling: they visually clash.
+  if (!songVisualsActive()) trailStart(midi, LOCAL, trailColor(midi), false);
+  songLocalPress(midi);
   if (inRoom()) getSocket().emit("note:on", { midi, velocity });
 }
 
@@ -48,6 +52,7 @@ export function releaseKey(midi: number): void {
   engine.noteOff(midi, LOCAL);
   useActiveNotes.getState().release(midi, LOCAL);
   trailEnd(midi, LOCAL);
+  songLocalRelease(midi);
   if (inRoom()) getSocket().emit("note:off", { midi });
 }
 
@@ -62,8 +67,12 @@ export function setPedal(down: boolean): void {
 
 export function remoteNoteOn(midi: number, velocity: number, from: string): void {
   if (!isValidMidi(midi)) return;
-  engine.noteOn(midi, velocity, from, peerInstrument(from));
-  trailStart(midi, from, trailColor(midi), true);
+  // Local-only mutes: skip sound and/or visuals for this peer, on this
+  // device only (the admin's room-wide mutes are enforced server-side).
+  const mute = localMuteOf(from);
+  if (!mute.audio) engine.noteOn(midi, velocity, from, peerInstrument(from));
+  // Peer trails are also hidden while song notes are falling.
+  if (!mute.notes && !songVisualsActive()) trailStart(midi, from, trailColor(midi), true);
 }
 
 export function remoteNoteOff(midi: number, from: string): void {
@@ -73,6 +82,7 @@ export function remoteNoteOff(midi: number, from: string): void {
 }
 
 export function remotePedal(down: boolean, from: string): void {
+  if (localMuteOf(from).audio) return;
   engine.setPedal(down, from);
 }
 

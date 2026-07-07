@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { RoomSummary, SoundMode } from "@pianojam/shared";
+import type { RoomSummary, RoomVisibility, SoundMode } from "@pianojam/shared";
 import { ROOM_LIMITS } from "@pianojam/shared";
 import { getSocket } from "../lib/socket";
 import { saveAdminToken } from "../state/profileStore";
@@ -17,24 +17,37 @@ function Logo() {
   );
 }
 
+const VISIBILITY_OPTIONS: { id: RoomVisibility; label: string; hint: string }[] = [
+  { id: "public", label: "Public", hint: "Listed in the room browser, anyone can join." },
+  { id: "private", label: "Private", hint: "Listed, but joining needs your invite link." },
+  { id: "hidden", label: "Hidden", hint: "Not listed anywhere; invite link only." },
+];
+
 function CreateRoomCard() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [maxPlayers, setMaxPlayers] = useState(4);
   const [chatEnabled, setChatEnabled] = useState(true);
   const [soundMode, setSoundMode] = useState<SoundMode>("admin");
+  const [visibility, setVisibility] = useState<RoomVisibility>("public");
   const [busy, setBusy] = useState(false);
 
   const create = () => {
     setBusy(true);
     getSocket().emit(
       "room:create",
-      { name: name.trim(), maxPlayers, chatEnabled, soundMode },
+      { name: name.trim(), maxPlayers, chatEnabled, soundMode, visibility },
       (res) => {
         setBusy(false);
         if (res.ok) {
           saveAdminToken(res.data.room.id, res.data.adminToken);
-          navigate(`/room/${res.data.room.id}`);
+          // Carry the invite in the URL so joining and sharing work
+          // right away for non-public rooms.
+          navigate(
+            res.data.room.visibility === "public"
+              ? `/room/${res.data.room.id}`
+              : `/room/${res.data.room.id}?invite=${res.data.inviteToken}`,
+          );
         } else {
           toast.error(res.error);
         }
@@ -94,6 +107,25 @@ function CreateRoomCard() {
           </label>
         </div>
 
+        <div className="mode-picker">
+          <span className="mode-picker-label">Visibility</span>
+          <div className="segmented">
+            {VISIBILITY_OPTIONS.map((option) => (
+              <button
+                type="button"
+                key={option.id}
+                className={`segment${visibility === option.id ? " selected" : ""}`}
+                onClick={() => setVisibility(option.id)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <div className="hint">
+            {VISIBILITY_OPTIONS.find((option) => option.id === visibility)!.hint}
+          </div>
+        </div>
+
         <label className="checkbox">
           <input
             type="checkbox"
@@ -140,22 +172,32 @@ function JoinRoomCard() {
         )}
         {rooms?.map((room) => {
           const full = room.playerCount >= room.maxPlayers;
+          const inviteOnly = room.visibility !== "public";
           return (
             <div key={room.id} className="room-row">
               <div className="room-row-info">
-                <span className="room-name">{room.name}</span>
+                <span className="room-name">
+                  {inviteOnly && (
+                    <span className="lock" title="Joining needs an invite link">
+                      🔒
+                    </span>
+                  )}{" "}
+                  {room.name}
+                </span>
                 <span className="room-meta">
                   #{room.id} · {room.playerCount}/{room.maxPlayers} players ·{" "}
                   {room.soundMode === "orchestra" ? "orchestra" : "solo instrument"}
                   {room.chatEnabled ? " · chat" : ""}
+                  {inviteOnly ? " · invite only" : ""}
                 </span>
               </div>
               <button
                 className="btn primary"
-                disabled={full}
+                disabled={full || inviteOnly}
+                title={inviteOnly ? "Ask someone in the room for an invite link" : undefined}
                 onClick={() => navigate(`/room/${room.id}`)}
               >
-                {full ? "Full" : "Join"}
+                {full ? "Full" : inviteOnly ? "Invite only" : "Join"}
               </button>
             </div>
           );

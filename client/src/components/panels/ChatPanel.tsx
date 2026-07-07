@@ -1,14 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { useRoomStore } from "../../state/roomStore";
+import { useLocalMuteStore } from "../../state/localMuteStore";
 import { getSocket } from "../../lib/socket";
 
 export function ChatPanel() {
-  const messages = useRoomStore((s) => s.messages);
+  const allMessages = useRoomStore((s) => s.messages);
   const setChatOpen = useRoomStore((s) => s.setChatOpen);
   const myName = useRoomStore((s) => s.self?.name);
   const muted = useRoomStore((s) => s.self?.mutedChat ?? false);
+  const localMutes = useLocalMuteStore((s) => s.mutes);
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Hide (don't drop) messages from players this user muted for themselves.
+  const messages = allMessages.filter((m) => !localMutes.get(m.from)?.chat);
 
   useEffect(() => {
     setChatOpen(true);

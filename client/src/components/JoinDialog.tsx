@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AVATARS, randomAvatar, ROOM_LIMITS } from "@pianojam/shared";
 import { getSocket } from "../lib/socket";
 import { randomNickname } from "../lib/names";
 import { useRoomStore } from "../state/roomStore";
 import { getAdminToken, useProfileStore } from "../state/profileStore";
+import { applyServerSongState } from "../song/engine";
 
 interface Props {
   roomId: string;
@@ -17,6 +19,7 @@ interface Props {
  */
 export function JoinDialog({ roomId }: Props) {
   const profile = useProfileStore();
+  const [searchParams] = useSearchParams();
   const [nickname, setNickname] = useState(profile.nickname);
   const [avatar, setAvatar] = useState(randomAvatar());
   const [error, setError] = useState<string | null>(null);
@@ -35,10 +38,19 @@ export function JoinDialog({ roomId }: Props) {
     profile.setAvatar(avatar);
     getSocket().emit(
       "room:join",
-      { roomId, nickname: name, avatar, adminToken: getAdminToken(roomId) },
+      {
+        roomId,
+        nickname: name,
+        avatar,
+        adminToken: getAdminToken(roomId),
+        inviteToken: searchParams.get("invite") ?? undefined,
+      },
       (res) => {
         if (res.ok) {
-          useRoomStore.getState().setJoined(res.data.room, res.data.players, res.data.self);
+          useRoomStore
+            .getState()
+            .setJoined(res.data.room, res.data.players, res.data.self, res.data.inviteToken);
+          applyServerSongState(res.data.song);
           return;
         }
         if (res.code === "NICKNAME_TAKEN" || res.code === "INVALID") {

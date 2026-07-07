@@ -1,6 +1,22 @@
 import crypto from "node:crypto";
-import type { Player, RoomSettings, RoomSummary, SoundMode } from "@pianojam/shared";
-import { DEFAULT_ROOM_INSTRUMENT, ROOM_LIMITS } from "@pianojam/shared";
+import type {
+  Player,
+  RoomSettings,
+  RoomSummary,
+  RoomVisibility,
+  SongControl,
+  SongData,
+  SongPlayback,
+  SongPlayMode,
+  SongScore,
+  SoundMode,
+} from "@pianojam/shared";
+import {
+  DEFAULT_ROOM_INSTRUMENT,
+  idleSongPlayback,
+  ROOM_LIMITS,
+  SONG_LIMITS,
+} from "@pianojam/shared";
 
 export interface Room {
   id: string;
@@ -9,10 +25,22 @@ export interface Room {
   instrumentId: string;
   /** Secret returned to the creator; presenting it on join claims admin. */
   adminToken: string;
+  /** Grants entry while the room is private or hidden. */
+  inviteToken: string;
   /** socket.id -> player */
   players: Map<string, Player>;
   /** Pending deletion while the room sits empty. */
   deleteTimer: NodeJS.Timeout | null;
+  /** Currently loaded song (one per room; loading replaces it). */
+  song: SongData | null;
+  /**
+   * Room-wide playback. positionSec is the position at updatedAtMs; while
+   * playing, the live position advances at `rate` song-seconds per second.
+   */
+  songPlayback: SongPlayback;
+  songUpdatedAtMs: number;
+  /** Latest Keep Up score per player name, kept for late joiners. */
+  songScores: Map<string, SongScore>;
 }
 
 /**
@@ -41,7 +69,11 @@ function pick<T>(arr: T[]): T {
 
 export type JoinResult =
   | { ok: true; room: Room }
-  | { ok: false; error: string; code: "NICKNAME_TAKEN" | "ROOM_FULL" | "NOT_FOUND" };
+  | {
+      ok: false;
+      error: string;
+      code: "NICKNAME_TAKEN" | "ROOM_FULL" | "NOT_FOUND" | "INVITE_INVALID";
+    };
 
 export class RoomManager {
   private rooms = new Map<string, Room>();
@@ -62,6 +94,7 @@ export class RoomManager {
     maxPlayers: number;
     chatEnabled: boolean;
     soundMode: SoundMode;
+    visibility: RoomVisibility;
   }): Room | string {
     const name = String(input.name ?? "").trim().slice(0, ROOM_LIMITS.nameMax);
     const maxPlayers = Math.floor(Number(input.maxPlayers));
@@ -81,11 +114,19 @@ export class RoomManager {
         maxPlayers,
         chatEnabled: Boolean(input.chatEnabled),
         soundMode,
+        visibility: input.visibility,
       },
       instrumentId: DEFAULT_ROOM_INSTRUMENT,
       adminToken: crypto.randomBytes(16).toString("hex"),
+      // Generated for every room regardless of visibility, so a public
+      // room can turn private later without changing the join flow.
+      inviteToken: crypto.randomBytes(16).toString("hex"),
       players: new Map(),
       deleteTimer: null,
+      song: null,
+      songPlayback: idleSongPlayback(),
+      songUpdatedAtMs: Date.now(),
+      songScores: new Map(),
     };
     this.rooms.set(id, room);
     this.scheduleDeletion(room);
@@ -109,6 +150,7 @@ export class RoomManager {
     socketId: string,
     profile: { nickname: string; avatar: string },
     adminToken: string | undefined,
+    inviteToken: string | undefined,
   ): JoinResult | { ok: true; room: Room; player: Player } {
     const room = this.rooms.get(roomId);
     if (!room) {
@@ -116,6 +158,20 @@ export class RoomManager {
         ok: false,
         error: "Room not found. It may have closed when everyone left.",
         code: "NOT_FOUND",
+      };
+    }
+    // Private/hidden rooms need the invite link. The admin token also grants
+    // entry so the room's creator is never locked out of their own room.
+    if (
+      room.settings.visibility !== "public" &&
+      inviteToken !== room.inviteToken &&
+      adminToken !== room.adminToken
+    ) {
+      return {
+        ok: false,
+        error:
+          "This room is invite-only. Ask someone in the room for a fresh invite link.",
+        code: "INVITE_INVALID",
       };
     }
     if (room.players.size >= room.settings.maxPlayers) {
@@ -249,8 +305,140 @@ export class RoomManager {
     return { room, instrumentForced: false };
   }
 
+  /** Admin changes who can find and enter the room. */
+  setVisibility(roomId: string, adminId: string, visibility: RoomVisibility): Room | null {
+    const room = this.rooms.get(roomId);
+    const admin = room?.players.get(adminId);
+    if (!room || !admin?.isAdmin || room.settings.visibility === visibility) return null;
+    room.settings.visibility = visibility;
+    return room;
+  }
+
+  /**
+   * Admin mints a new invite token. Previously shared links stop working;
+   * players already in the room are unaffected.
+   */
+  regenerateInvite(roomId: string, adminId: string): string | null {
+    const room = this.rooms.get(roomId);
+    const admin = room?.players.get(adminId);
+    if (!room || !admin?.isAdmin) return null;
+    room.inviteToken = crypto.randomBytes(16).toString("hex");
+    return room.inviteToken;
+  }
+
+  /**
+   * The live playback snapshot. While playing, the position advances with
+   * the wall clock; a song that ran past its end settles into "stopped"
+   * (scores are kept until the next load or start).
+   */
+  songPlaybackNow(room: Room): SongPlayback {
+    const pb = room.songPlayback;
+    if (pb.state === "playing" && room.song) {
+      const position =
+        pb.positionSec + ((Date.now() - room.songUpdatedAtMs) / 1000) * pb.rate;
+      if (position >= room.song.durationSec + 1) {
+        room.songPlayback = { ...pb, state: "stopped", positionSec: 0 };
+        room.songUpdatedAtMs = Date.now();
+      } else {
+        return { ...pb, positionSec: position };
+      }
+    }
+    return { ...room.songPlayback };
+  }
+
+  /** Admin loads a (already sanitized) song, replacing the current one. */
+  loadSong(roomId: string, adminId: string, song: SongData): Room | null {
+    const room = this.rooms.get(roomId);
+    const admin = room?.players.get(adminId);
+    if (!room || !admin?.isAdmin) return null;
+    room.song = song;
+    room.songPlayback = idleSongPlayback();
+    room.songUpdatedAtMs = Date.now();
+    room.songScores.clear();
+    return room;
+  }
+
+  /** Admin transport controls; returns the room or null when not allowed. */
+  controlSong(roomId: string, adminId: string, control: SongControl): Room | null {
+    const room = this.rooms.get(roomId);
+    const admin = room?.players.get(adminId);
+    if (!room || !admin?.isAdmin || !room.song) return null;
+
+    const pb = this.songPlaybackNow(room);
+    const apply = (next: Partial<SongPlayback>) => {
+      room.songPlayback = { ...pb, ...next };
+      room.songUpdatedAtMs = Date.now();
+    };
+
+    switch (control.type) {
+      case "play": {
+        if (pb.state === "playing") return null;
+        if (pb.state === "stopped") {
+          // A fresh start: adopt the requested mode and begin before the
+          // first note. A resume keeps the mode the session started with.
+          const mode: SongPlayMode = control.mode === "keepup" ? "keepup" : "play";
+          if (mode === "keepup") room.songScores.clear();
+          apply({ mode, state: "playing", positionSec: -SONG_LIMITS.leadInSec });
+        } else {
+          apply({ state: "playing" });
+        }
+        return room;
+      }
+      case "pause":
+        if (pb.state !== "playing") return null;
+        apply({ state: "paused" });
+        return room;
+      case "stop":
+        if (pb.state === "stopped") return null;
+        apply({ state: "stopped", positionSec: 0 });
+        return room;
+      case "seek": {
+        if (pb.state === "stopped") return null;
+        const position = Number(control.positionSec);
+        if (!Number.isFinite(position)) return null;
+        apply({ positionSec: Math.min(room.song.durationSec, Math.max(0, position)) });
+        return room;
+      }
+      case "rate": {
+        const rate = Number(control.rate);
+        if (!Number.isFinite(rate)) return null;
+        apply({
+          rate:
+            Math.round(
+              Math.min(SONG_LIMITS.maxRate, Math.max(SONG_LIMITS.minRate, rate)) * 100,
+            ) / 100,
+        });
+        return room;
+      }
+      case "transpose": {
+        const semitones = Math.round(Number(control.semitones));
+        if (!Number.isFinite(semitones)) return null;
+        apply({
+          transpose: Math.min(
+            SONG_LIMITS.maxTranspose,
+            Math.max(-SONG_LIMITS.maxTranspose, semitones),
+          ),
+        });
+        return room;
+      }
+      default:
+        return null;
+    }
+  }
+
+  /** Stores a player's reported Keep Up score (only during a Keep Up song). */
+  setSongScore(roomId: string, playerId: string, score: SongScore): Player | null {
+    const room = this.rooms.get(roomId);
+    const player = room?.players.get(playerId);
+    if (!room || !player || !room.song || room.songPlayback.mode !== "keepup") return null;
+    room.songScores.set(player.name, score);
+    return player;
+  }
+
   list(): RoomSummary[] {
-    return [...this.rooms.values()].map((room) => this.summarize(room));
+    return [...this.rooms.values()]
+      .filter((room) => room.settings.visibility !== "hidden")
+      .map((room) => this.summarize(room));
   }
 
   summarize(room: Room): RoomSummary {

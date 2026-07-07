@@ -1,12 +1,20 @@
-import type { SoundMode } from "@pianojam/shared";
+import type { RoomVisibility, SoundMode } from "@pianojam/shared";
 import { useRoomStore } from "../../state/roomStore";
 import { getSocket } from "../../lib/socket";
 import { getInstrument } from "../../audio/instruments";
+import { toast } from "../../state/toastStore";
+
+const VISIBILITY_OPTIONS: { id: RoomVisibility; label: string; hint: string }[] = [
+  { id: "public", label: "Public", hint: "Listed in the room browser, anyone can join." },
+  { id: "private", label: "Private", hint: "Listed, but joining needs the invite link." },
+  { id: "hidden", label: "Hidden", hint: "Not listed anywhere; invite link only." },
+];
 
 /**
- * Admin-only room controls: switch the sound mode, mute players (chat and/or
- * playing) and kick players. Leaving orchestra mode forces everyone onto the
- * admin's current instrument (the server handles that).
+ * Admin-only room controls: switch the sound mode, change visibility,
+ * regenerate the invite link, mute players (chat and/or playing) and kick
+ * players. Leaving orchestra mode forces everyone onto the admin's current
+ * instrument (the server handles that).
  */
 export function RoomSettingsPanel() {
   const room = useRoomStore((s) => s.room);
@@ -18,6 +26,20 @@ export function RoomSettingsPanel() {
 
   const setMode = (mode: SoundMode) => {
     if (mode !== room.soundMode) getSocket().emit("room:setMode", mode);
+  };
+
+  const setVisibility = (visibility: RoomVisibility) => {
+    if (visibility !== room.visibility) getSocket().emit("room:setVisibility", visibility);
+  };
+
+  const regenerateInvite = () => {
+    getSocket().emit("room:regenerateInvite", (res) => {
+      if (res.ok) {
+        toast.success("New invite link created. Links shared before now no longer work.");
+      } else {
+        toast.error(res.error);
+      }
+    });
   };
 
   const setMute = (playerId: string, chat: boolean, notes: boolean) => {
@@ -57,6 +79,33 @@ export function RoomSettingsPanel() {
             Switching to solo instrument moves everyone to your current sound pack.
           </div>
         )}
+      </div>
+
+      <div className="mode-picker">
+        <span className="mode-picker-label">Visibility</span>
+        <div className="segmented">
+          {VISIBILITY_OPTIONS.map((option) => (
+            <button
+              type="button"
+              key={option.id}
+              className={`segment${room.visibility === option.id ? " selected" : ""}`}
+              onClick={() => setVisibility(option.id)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <div className="hint">
+          {VISIBILITY_OPTIONS.find((option) => option.id === room.visibility)!.hint}
+        </div>
+        <div className="row-between">
+          <span className="hint">
+            Regenerating makes previously shared invite links stop working.
+          </span>
+          <button className="btn ghost small" onClick={regenerateInvite}>
+            ↻ New invite link
+          </button>
+        </div>
       </div>
 
       <div className="mode-picker-label">Players</div>

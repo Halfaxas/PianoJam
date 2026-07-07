@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Keyboard } from "../components/Keyboard";
 import { NoteCanvas } from "../components/NoteCanvas";
 import { NoteChordDisplay } from "../components/NoteChordDisplay";
 import { PlayerStrip } from "../components/PlayerStrip";
+import { ReactionBar } from "../components/ReactionBar";
+import { SongHud } from "../components/SongHud";
 import { JoinDialog } from "../components/JoinDialog";
 import { TopBar } from "../components/TopBar";
 import { Modal } from "../components/Modal";
@@ -13,9 +15,15 @@ import { ThemePanel } from "../components/panels/ThemePanel";
 import { RoomSettingsPanel } from "../components/panels/RoomSettingsPanel";
 import { ChatPanel } from "../components/panels/ChatPanel";
 import { SaveRecordingPanel } from "../components/panels/SaveRecordingPanel";
+import { SongPanel } from "../components/panels/SongPanel";
+import { SongSummaryPanel } from "../components/panels/SongSummaryPanel";
 import { getSocket } from "../lib/socket";
 import { useIsAdmin, useRoomStore } from "../state/roomStore";
 import { useUiStore } from "../state/uiStore";
+import { useLocalMuteStore } from "../state/localMuteStore";
+import { useReactionStore } from "../state/reactionStore";
+import { useSongStore } from "../state/songStore";
+import { resetSongEngine } from "../song/engine";
 import { useThemeStore } from "../state/themeStore";
 import { useAudioStore } from "../state/audioStore";
 import { attachQwerty } from "../audio/qwerty";
@@ -35,6 +43,8 @@ export function RoomPage() {
   const isAdmin = useIsAdmin();
   const openPanel = useUiStore((s) => s.openPanel);
   const setOpenPanel = useUiStore((s) => s.setOpenPanel);
+  const summaryOpen = useSongStore((s) => s.summaryOpen);
+  const setSummaryOpen = useSongStore((s) => s.setSummaryOpen);
   const [chatVisible, setChatVisible] = useState(false);
   const [pendingRecording, setPendingRecording] = useState<Blob | null>(null);
 
@@ -47,6 +57,9 @@ export function RoomPage() {
       clearTrails();
       stopMetronome();
       useRoomStore.getState().leave();
+      useLocalMuteStore.getState().reset();
+      useReactionStore.getState().clear();
+      resetSongEngine();
       useUiStore.getState().setOpenPanel(null);
     };
   }, [roomId]);
@@ -59,6 +72,21 @@ export function RoomPage() {
     void loadMyInstrument(useAudioStore.getState().instrumentId);
     return detach;
   }, []);
+
+  // Keep the invite token in the address bar for non-public rooms, so a
+  // refresh (or copying the URL) keeps working even after the admin
+  // regenerates the invite link.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const inviteToken = useRoomStore((s) => s.inviteToken);
+  const visibility = useRoomStore((s) => s.room?.visibility);
+  useEffect(() => {
+    if (status !== "joined" || !inviteToken || visibility === "public") return;
+    if (searchParams.get("invite") !== inviteToken) {
+      const next = new URLSearchParams(searchParams);
+      next.set("invite", inviteToken);
+      setSearchParams(next, { replace: true });
+    }
+  }, [status, inviteToken, visibility, searchParams, setSearchParams]);
 
   // In admin-sound rooms, adopt the room's instrument on join.
   const roomInstrument = useRoomStore((s) =>
@@ -106,6 +134,8 @@ export function RoomPage() {
         <NoteCanvas />
         <PlayerStrip />
         <NoteChordDisplay />
+        <SongHud />
+        {status === "joined" && <ReactionBar />}
         {!audioReady && status === "joined" && (
           <div className="audio-hint">🔊 Click, tap or play a key to enable sound</div>
         )}
@@ -138,6 +168,16 @@ export function RoomPage() {
       {openPanel === "settings" && isAdmin && (
         <Modal title="Room settings" onClose={() => setOpenPanel(null)}>
           <RoomSettingsPanel />
+        </Modal>
+      )}
+      {openPanel === "song" && (
+        <Modal title="Song mode" onClose={() => setOpenPanel(null)}>
+          <SongPanel />
+        </Modal>
+      )}
+      {summaryOpen && (
+        <Modal title="Keep up results" onClose={() => setSummaryOpen(false)} width={380}>
+          <SongSummaryPanel />
         </Modal>
       )}
       {pendingRecording && (

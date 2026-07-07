@@ -65,7 +65,11 @@ export function TopBar({ chatVisible, toggleChat, onRecordingReady }: Props) {
 
   const shareRoom = async () => {
     if (!room) return;
-    const url = `${window.location.origin}/room/${room.id}`;
+    // Non-public rooms are invite-link-only, so the link must carry the token.
+    const { inviteToken } = useRoomStore.getState();
+    const invite =
+      room.visibility !== "public" && inviteToken ? `?invite=${inviteToken}` : "";
+    const url = `${window.location.origin}/room/${room.id}${invite}`;
     try {
       await navigator.clipboard.writeText(url);
       toast.success("Room link copied. Send it to a friend!");
@@ -97,6 +101,9 @@ export function TopBar({ chatVisible, toggleChat, onRecordingReady }: Props) {
         </button>
         <button className="btn ghost" onClick={() => toggle("metronome")}>
           Metronome
+        </button>
+        <button className="btn ghost" onClick={() => toggle("song")}>
+          🎵 Song
         </button>
         <button className="btn ghost" onClick={() => toggle("theme")}>
           Colors
