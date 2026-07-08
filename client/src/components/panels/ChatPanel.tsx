@@ -33,7 +33,7 @@ export function ChatPanel() {
 
   return (
     <div className="chat">
-      <div className="chat-messages" ref={scrollRef}>
+      <div className="chat-messages" ref={scrollRef} aria-live="polite">
         {messages.map((m, i) => (
           <div
             key={i}
@@ -49,6 +49,7 @@ export function ChatPanel() {
           value={draft}
           maxLength={500}
           placeholder={muted ? "The admin muted you in chat" : "Message the room…"}
+          aria-label="Chat message"
           disabled={muted}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && send()}

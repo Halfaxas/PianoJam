@@ -66,7 +66,13 @@ export function JoinDialog({ roomId }: Props) {
 
   return (
     <div className="join-backdrop">
-      <form className="card join-dialog" onSubmit={join}>
+      <form
+        className="card join-dialog"
+        onSubmit={join}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Joining room"
+      >
         <h2>Joining room</h2>
         <p className="hint">Pick a nickname and an avatar for this session.</p>
 
@@ -85,6 +91,7 @@ export function JoinDialog({ roomId }: Props) {
             value={nickname}
             maxLength={ROOM_LIMITS.nicknameMax}
             placeholder="e.g. NimbleFingers"
+            aria-label="Nickname"
             onChange={(e) => setNickname(e.target.value)}
             autoFocus
           />
@@ -100,6 +107,7 @@ export function JoinDialog({ roomId }: Props) {
               type="button"
               key={id}
               className={`avatar-option${avatar === id ? " selected" : ""}`}
+              aria-pressed={avatar === id}
               onClick={() => setAvatar(id)}
               title={id}
             >
@@ -109,7 +117,8 @@ export function JoinDialog({ roomId }: Props) {
         </div>
 
         <button className="btn primary full" disabled={busy || !nickname.trim()}>
-          {busy ? "Joining..." : "Join room"}
+          {busy ? "Joining…" : "Join room"}
+          {busy && <span className="spinner" />}
         </button>
       </form>
     </div>

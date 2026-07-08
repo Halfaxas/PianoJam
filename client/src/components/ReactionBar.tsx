@@ -31,7 +31,7 @@ export function ReactionBar() {
           key={reaction}
           className="reaction-btn"
           disabled={coolingDown}
-          title="React"
+          aria-label={`React with ${reaction}`}
           onClick={() => send(reaction)}
         >
           {reaction}

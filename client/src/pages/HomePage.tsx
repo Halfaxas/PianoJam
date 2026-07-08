@@ -5,6 +5,7 @@ import { ROOM_LIMITS } from "@pianojam/shared";
 import { getSocket } from "../lib/socket";
 import { saveAdminToken } from "../state/profileStore";
 import { toast } from "../state/toastStore";
+import { Icon } from "../components/Icon";
 
 function Logo() {
   return (
@@ -60,7 +61,9 @@ function CreateRoomCard() {
       <h2>Create a room</h2>
       <div className="form">
         <label>
-          Room name <span className="hint-inline">(optional)</span>
+          <span>
+            Room name <span className="hint-inline">(optional)</span>
+          </span>
           <input
             value={name}
             maxLength={ROOM_LIMITS.nameMax}
@@ -115,6 +118,7 @@ function CreateRoomCard() {
                 type="button"
                 key={option.id}
                 className={`segment${visibility === option.id ? " selected" : ""}`}
+                aria-pressed={visibility === option.id}
                 onClick={() => setVisibility(option.id)}
               >
                 {option.label}
@@ -135,7 +139,8 @@ function CreateRoomCard() {
           Enable chat
         </label>
         <button className="btn primary full" onClick={create} disabled={busy}>
-          {busy ? "Creating..." : "Create room"}
+          {busy ? "Creating…" : "Create room"}
+          {busy && <span className="spinner" />}
         </button>
       </div>
     </section>
@@ -161,14 +166,14 @@ function JoinRoomCard() {
     <section className="card">
       <div className="row-between">
         <h2>Join a room</h2>
-        <button className="icon-btn" onClick={refresh} title="Refresh list">
-          ⟳
+        <button className="icon-btn" onClick={refresh} title="Refresh list" aria-label="Refresh list">
+          <Icon name="refresh" size={14} />
         </button>
       </div>
       <div className="room-list">
-        {rooms === null && <div className="hint">Loading rooms...</div>}
+        {rooms === null && <div className="hint">Loading rooms…</div>}
         {rooms?.length === 0 && (
-          <div className="hint">No rooms are live right now. Create the first one!</div>
+          <div className="hint">No rooms are live right now. Create the first one.</div>
         )}
         {rooms?.map((room) => {
           const full = room.playerCount >= room.maxPlayers;
@@ -179,7 +184,7 @@ function JoinRoomCard() {
                 <span className="room-name">
                   {inviteOnly && (
                     <span className="lock" title="Joining needs an invite link">
-                      🔒
+                      <Icon name="lock" size={12} />
                     </span>
                   )}{" "}
                   {room.name}
@@ -192,7 +197,7 @@ function JoinRoomCard() {
                 </span>
               </div>
               <button
-                className="btn primary"
+                className="btn ghost"
                 disabled={full || inviteOnly}
                 title={inviteOnly ? "Ask someone in the room for an invite link" : undefined}
                 onClick={() => navigate(`/room/${room.id}`)}
@@ -206,7 +211,8 @@ function JoinRoomCard() {
       <div className="join-by-id">
         <input
           value={joinId}
-          placeholder="...or enter a room ID"
+          placeholder="…or enter a room ID"
+          aria-label="Room ID"
           onChange={(e) => setJoinId(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && joinId.trim() && navigate(`/room/${joinId.trim()}`)}
         />

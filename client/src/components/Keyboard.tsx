@@ -92,6 +92,8 @@ export function Keyboard() {
   return (
     <div
       className="keyboard"
+      role="group"
+      aria-label="Piano keyboard. Play with your mouse, touch, a MIDI device, or your computer keys — press 0-8 to pick the octave, hold Shift for sharps."
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endPointer}

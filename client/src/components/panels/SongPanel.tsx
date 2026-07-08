@@ -8,6 +8,7 @@ import { toast } from "../../state/toastStore";
 import { getSocket } from "../../lib/socket";
 import { BUNDLED_SONGS, parseMidiBuffer } from "../../song/bundled";
 import { currentPositionSec, exitWaitMode, startWaitMode } from "../../song/engine";
+import { Icon } from "../Icon";
 
 function formatTime(sec: number): string {
   const s = Math.max(0, Math.round(sec));
@@ -77,10 +78,11 @@ function SongPicker({ onClose, showBack }: { onClose: () => void; showBack: bool
           <button
             key={s.id}
             className={`list-item${selected ? " selected" : ""}`}
+            aria-pressed={selected}
             disabled={busy !== null}
             onClick={() => void loadBundled(s.id)}
           >
-            🎼 {s.title}
+            <Icon name="music" size={14} /> {s.title}
             {busy === s.id ? (
               <span className="spinner list-item-spinner" />
             ) : (
@@ -105,7 +107,8 @@ function SongPicker({ onClose, showBack }: { onClose: () => void; showBack: bool
         disabled={busy !== null}
         onClick={() => fileRef.current?.click()}
       >
-        📂 Upload a .mid file{busy === "upload" && <span className="spinner" />}
+        <Icon name="upload" size={14} /> Upload a .mid file
+        {busy === "upload" && <span className="spinner" />}
       </button>
       <div className="hint">Loading a song replaces the current one for everyone.</div>
     </div>
@@ -145,17 +148,19 @@ function Transport() {
         <div className="segmented">
           <button
             className={`segment${modeChoice === "play" ? " selected" : ""}`}
+            aria-pressed={modeChoice === "play"}
             onClick={() => setModeChoice("play")}
             title="The song plays by itself; everyone can play along"
           >
-            ▶ Playback
+            <Icon name="play" size={12} /> Playback
           </button>
           <button
             className={`segment${modeChoice === "keepup" ? " selected" : ""}`}
+            aria-pressed={modeChoice === "keepup"}
             onClick={() => setModeChoice("keepup")}
             title="The song is silent and everyone is graded on playing it"
           >
-            🏁 Keep up
+            <Icon name="flag" size={12} /> Keep up
           </button>
         </div>
       ) : (
@@ -171,14 +176,14 @@ function Transport() {
             className="btn primary"
             onClick={() => getSocket().emit("song:control", { type: "play", mode: modeChoice })}
           >
-            ▶ {state === "paused" ? "Resume" : "Start"}
+            <Icon name="play" size={14} /> {state === "paused" ? "Resume" : "Start"}
           </button>
         ) : (
           <button
             className="btn ghost"
             onClick={() => getSocket().emit("song:control", { type: "pause" })}
           >
-            ⏸ Pause
+            <Icon name="pause" size={14} /> Pause
           </button>
         )}
         <button
@@ -186,7 +191,7 @@ function Transport() {
           disabled={state === "stopped"}
           onClick={() => getSocket().emit("song:control", { type: "stop" })}
         >
-          ⏹ Stop
+          <Icon name="stop" size={14} /> Stop
         </button>
         <span className="song-time">
           {formatTime(pos)} / {formatTime(song.durationSec)}
@@ -210,6 +215,18 @@ function Transport() {
             positionSec: Number((e.target as HTMLInputElement).value),
           });
         }}
+        onKeyUp={(e) => {
+          // Keyboard seeking commits too; pointerup never fires for it.
+          dragging.current = false;
+          getSocket().emit("song:control", {
+            type: "seek",
+            positionSec: Number((e.target as HTMLInputElement).value),
+          });
+        }}
+        onBlur={() => {
+          dragging.current = false;
+        }}
+        aria-label="Seek"
         title="Seek"
       />
       <label>
@@ -224,6 +241,12 @@ function Transport() {
           onPointerUp={() =>
             getSocket().emit("song:control", { type: "rate", rate: ratePct / 100 })
           }
+          onKeyUp={(e) =>
+            getSocket().emit("song:control", {
+              type: "rate",
+              rate: Number((e.target as HTMLInputElement).value) / 100,
+            })
+          }
         />
       </label>
       <div className="row-between">
@@ -233,6 +256,7 @@ function Transport() {
         <span>
           <button
             className="btn ghost small"
+            aria-label="Transpose down one semitone"
             disabled={transpose <= -SONG_LIMITS.maxTranspose}
             onClick={() =>
               getSocket().emit("song:control", { type: "transpose", semitones: transpose - 1 })
@@ -242,6 +266,7 @@ function Transport() {
           </button>{" "}
           <button
             className="btn ghost small"
+            aria-label="Transpose up one semitone"
             disabled={transpose >= SONG_LIMITS.maxTranspose}
             onClick={() =>
               getSocket().emit("song:control", { type: "transpose", semitones: transpose + 1 })
@@ -260,6 +285,9 @@ function SoloSection() {
   const song = useSongStore((s) => s.song);
   const playback = useSongStore((s) => s.playback);
   const solo = useSongStore((s) => s.solo);
+  // Admins already have a primary Start in the transport above; keep one
+  // dominant action per panel.
+  const isAdmin = useIsAdmin();
   if (!song) return null;
 
   const sharedActive = playback !== null && playback.state !== "stopped";
@@ -269,8 +297,8 @@ function SoloSection() {
       <div className="song-solo">
         <span className="mode-picker-label">Solo practice</span>
         <div className="solo-stats">
-          <span>✔ {solo.correct}</span>
-          <span>✘ {solo.wrong}</span>
+          <span className="song-hud-good">{solo.correct} hit</span>
+          <span className="song-hud-bad">{solo.wrong} wrong</span>
           <b>{solo.accuracy}%</b>
         </div>
         <div className="hint">
@@ -301,13 +329,13 @@ function SoloSection() {
         }
       >
         <button
-          className="btn primary full"
+          className={`btn ${isAdmin ? "ghost" : "primary"} full`}
           disabled={sharedActive}
           onClick={() => {
             if (!startWaitMode()) toast.error("Solo practice isn't available right now.");
           }}
         >
-          🎯 Practice on my own
+          <Icon name="target" size={14} /> Practice on my own
         </button>
       </span>
     </div>
@@ -354,7 +382,9 @@ export function SongPanel() {
       {song ? (
         <div className="song-current">
           <div className="song-current-info">
-            <span className="song-title">🎵 {song.title}</span>
+            <span className="song-title">
+              <Icon name="music" size={14} /> {song.title}
+            </span>
             <span className="hint">
               {formatTime(song.durationSec)} · {song.notes.length} notes
               {loadedBy ? ` · loaded by ${loadedBy}` : ""}

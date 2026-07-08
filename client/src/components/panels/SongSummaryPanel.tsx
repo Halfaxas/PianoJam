@@ -14,7 +14,6 @@ export function SongSummaryPanel() {
   const rows = Object.entries(scores).sort(
     (a, b) => b[1].accuracy - a[1].accuracy || b[1].bestStreak - a[1].bestStreak,
   );
-  const medals = ["🥇", "🥈", "🥉"];
 
   return (
     <div className="song-summary">
@@ -24,11 +23,12 @@ export function SongSummaryPanel() {
         const avatar = players.find((p) => p.name === name)?.avatar;
         return (
           <div key={name} className={`summary-row${name === selfName ? " mine" : ""}`}>
-            <span className="summary-rank">{medals[i] ?? `${i + 1}.`}</span>
+            <span className={`summary-rank${i < 3 ? ` rank-${i + 1}` : ""}`}>{i + 1}</span>
             {avatar && <img className="player-avatar" src={`/avatars/${avatar}.svg`} alt="" />}
             <span className="summary-name">{name}</span>
             <span className="summary-detail">
-              {score.hit}✔ {score.early + score.late}~ {score.miss}✘ · best ×{score.bestStreak}
+              {score.hit} hit · {score.early + score.late} near · {score.miss} miss · best ×
+              {score.bestStreak}
             </span>
             <b className="summary-accuracy">{score.accuracy}%</b>
           </div>

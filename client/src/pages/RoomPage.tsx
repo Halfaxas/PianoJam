@@ -9,6 +9,7 @@ import { SongHud } from "../components/SongHud";
 import { JoinDialog } from "../components/JoinDialog";
 import { TopBar } from "../components/TopBar";
 import { Modal } from "../components/Modal";
+import { Icon } from "../components/Icon";
 import { MetronomePanel } from "../components/panels/MetronomePanel";
 import { SoundPackPanel } from "../components/panels/SoundPackPanel";
 import { ThemePanel } from "../components/panels/ThemePanel";
@@ -37,6 +38,7 @@ export function RoomPage() {
   const { roomId } = useParams<{ roomId: string }>();
   const status = useRoomStore((s) => s.status);
   const error = useRoomStore((s) => s.error);
+  const roomName = useRoomStore((s) => s.room?.name);
   const background = useThemeStore((s) => s.background);
   const audioReady = useAudioStore((s) => s.audioReady);
 
@@ -124,20 +126,23 @@ export function RoomPage() {
       style={{ background, "--scroll-thumb": background } as React.CSSProperties}
       onPointerDown={unlockAudio}
     >
+      <h1 className="sr-only">{roomName ?? "PianoJam room"}</h1>
       <TopBar
         chatVisible={chatVisible}
         toggleChat={() => setChatVisible((v) => !v)}
         onRecordingReady={(blob) => setPendingRecording(blob)}
       />
 
-      <main className="stage">
+      <main className={`stage${chatVisible ? " chat-open" : ""}`}>
         <NoteCanvas />
         <PlayerStrip />
         <NoteChordDisplay />
         <SongHud />
         {status === "joined" && <ReactionBar />}
         {!audioReady && status === "joined" && (
-          <div className="audio-hint">🔊 Click, tap or play a key to enable sound</div>
+          <div className="audio-hint">
+            <Icon name="volume" /> Click, tap or play a key to enable sound
+          </div>
         )}
         {chatVisible && (
           <aside className="chat-drawer">

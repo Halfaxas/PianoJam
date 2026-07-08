@@ -7,10 +7,12 @@ export interface ThemeColors {
   blackTrail: string;
 }
 
+// Defaults mirror the app's brass accent (--accent) and a deeper sibling
+// for black keys; users can repaint them freely in the Colors panel.
 export const DEFAULT_THEME: ThemeColors = {
-  background: "#0d1117",
-  whiteTrail: "#6ee7ff",
-  blackTrail: "#a78bfa",
+  background: "#131110",
+  whiteTrail: "#dfa94d",
+  blackTrail: "#c96f45",
 };
 
 interface ThemeState extends ThemeColors {

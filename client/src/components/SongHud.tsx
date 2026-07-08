@@ -1,5 +1,6 @@
 import { useRoomStore } from "../state/roomStore";
 import { useSongStore } from "../state/songStore";
+import { Icon } from "./Icon";
 
 /**
  * Floating live score card at the top of the stage. Shows the solo practice
@@ -14,12 +15,14 @@ export function SongHud() {
 
   if (solo.active) {
     return (
-      <div className="song-hud" role="status">
-        <span className="song-hud-title">🎯 Practice</span>
+      <div className="song-hud">
+        <span className="song-hud-title">
+          <Icon name="target" size={12} /> Practice
+        </span>
         <span className="song-hud-acc">{solo.accuracy}%</span>
         <div className="song-hud-stats">
-          <span className="song-hud-good">✔ {solo.correct}</span>
-          <span className="song-hud-bad">✘ {solo.wrong}</span>
+          <span className="song-hud-good">{solo.correct} hit</span>
+          <span className="song-hud-bad">{solo.wrong} wrong</span>
         </div>
       </div>
     );
@@ -29,14 +32,20 @@ export function SongHud() {
     playback !== null && playback.state !== "stopped" && playback.mode === "keepup";
   if (!keepUpLive || !score) return null;
   return (
-    <div className="song-hud" role="status">
-      <span className="song-hud-title">🏁 Keep up</span>
+    <div className="song-hud">
+      <span className="song-hud-title">
+        <Icon name="flag" size={12} /> Keep up
+      </span>
       <span className="song-hud-acc">{score.accuracy}%</span>
       <div className="song-hud-stats">
-        <span className="song-hud-good">✔ {score.hit}</span>
-        <span className="song-hud-mid">◐ {score.early + score.late}</span>
-        <span className="song-hud-bad">✘ {score.miss}</span>
-        {score.streak > 1 && <span className="song-hud-streak">🔥 {score.streak}</span>}
+        <span className="song-hud-good">{score.hit} hit</span>
+        <span className="song-hud-mid">{score.early + score.late} near</span>
+        <span className="song-hud-bad">{score.miss} miss</span>
+        {score.streak > 1 && (
+          <span className="song-hud-streak">
+            <Icon name="flame" size={11} /> {score.streak}
+          </span>
+        )}
       </div>
     </div>
   );

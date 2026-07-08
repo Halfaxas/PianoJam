@@ -19,6 +19,7 @@ export function ThemePanel() {
           <button
             key={key}
             className={`swatch-row${editing === key ? " selected" : ""}`}
+            aria-pressed={editing === key}
             onClick={() => setEditing(key)}
           >
             <span className="swatch" style={{ background: theme[key] }} />

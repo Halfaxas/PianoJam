@@ -5,6 +5,7 @@ import { useLocalMuteStore, type LocalMute } from "../state/localMuteStore";
 import { useReactionStore } from "../state/reactionStore";
 import { useSongStore } from "../state/songStore";
 import { getInstrument } from "../audio/instruments";
+import { Icon, type IconName } from "./Icon";
 
 /**
  * Always-visible roster on the stage: who is in the room (avatar +
@@ -13,10 +14,10 @@ import { getInstrument } from "../audio/instruments";
  * local-only mutes (sound / notes / chat) that never affect anyone else.
  */
 
-const MUTE_OPTIONS: { kind: keyof LocalMute; label: string; title: string }[] = [
-  { kind: "audio", label: "🔊 Sound", title: "Play their notes out loud" },
-  { kind: "notes", label: "🎹 Notes", title: "Show their falling notes" },
-  { kind: "chat", label: "💬 Chat", title: "Show their chat messages" },
+const MUTE_OPTIONS: { kind: keyof LocalMute; icon: IconName; label: string; title: string }[] = [
+  { kind: "audio", icon: "volume", label: "Sound", title: "Play their notes out loud" },
+  { kind: "notes", icon: "music", label: "Notes", title: "Show their falling notes" },
+  { kind: "chat", icon: "chat", label: "Chat", title: "Show their chat messages" },
 ];
 
 function MuteMenu({ name }: { name: string }) {
@@ -25,16 +26,17 @@ function MuteMenu({ name }: { name: string }) {
 
   return (
     <div className="mute-menu">
-      {MUTE_OPTIONS.map(({ kind, label, title }) => {
+      {MUTE_OPTIONS.map(({ kind, icon, label, title }) => {
         const active = mute?.[kind] ?? false;
         return (
           <button
             key={kind}
             className={`btn ghost small${active ? " active" : ""}`}
+            aria-pressed={active}
             title={active ? `Muted for you. Click to ${title.toLowerCase()} again` : title}
             onClick={() => toggle(name, kind)}
           >
-            {label}
+            <Icon name={icon} size={13} /> {label}
           </button>
         );
       })}
@@ -94,15 +96,20 @@ export function PlayerStrip() {
               <div className="player-chip-text">
                 <span className="player-chip-name">
                   {p.isAdmin && (
-                    <span className="crown" title="Room admin">
-                      👑
+                    <span className="crown" role="img" aria-label="Room admin" title="Room admin">
+                      <Icon name="crown" size={13} />
                     </span>
                   )}
                   {p.name}
                   {isSelf && <span className="tag">you</span>}
                   {mutedAny && (
-                    <span className="local-mute-mark" title="Muted for you only">
-                      🔇
+                    <span
+                      className="local-mute-mark"
+                      role="img"
+                      aria-label="Muted for you only"
+                      title="Muted for you only"
+                    >
+                      <Icon name="volume-off" size={12} />
                     </span>
                   )}
                 </span>
@@ -115,16 +122,23 @@ export function PlayerStrip() {
                   className="score-chip"
                   title={`Keep up: ${score.hit} hit, ${score.miss} missed, best streak ${score.bestStreak}`}
                 >
-                  {score.accuracy}%{score.streak >= 3 ? ` 🔥${score.streak}` : ""}
+                  {score.accuracy}%
+                  {score.streak >= 3 && (
+                    <>
+                      <Icon name="flame" size={11} /> {score.streak}
+                    </>
+                  )}
                 </span>
               )}
               {!isSelf && (
                 <button
                   className="icon-btn chip-menu-btn"
+                  aria-label={`Mute options for ${p.name}`}
+                  aria-expanded={menuFor === p.name}
                   title="Mute for me only"
                   onClick={() => setMenuFor(menuFor === p.name ? null : p.name)}
                 >
-                  ⋯
+                  <Icon name="more" size={14} />
                 </button>
               )}
             </div>
@@ -147,7 +161,8 @@ export function PlayerStrip() {
             )
           }
         >
-          {allOthersQuiet ? "🔊 Unmute others" : "🔇 Mute others"}
+          <Icon name={allOthersQuiet ? "volume" : "volume-off"} size={13} />{" "}
+          {allOthersQuiet ? "Unmute others" : "Mute others"}
         </button>
       )}
     </div>

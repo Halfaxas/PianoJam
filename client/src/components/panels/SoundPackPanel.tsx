@@ -33,6 +33,7 @@ export function SoundPackPanel() {
             key={inst.id}
             disabled={locked}
             className={`list-item${inst.id === instrumentId ? " selected" : ""}`}
+            aria-pressed={inst.id === instrumentId}
             onClick={() => void pick(inst.id)}
           >
             {inst.label}

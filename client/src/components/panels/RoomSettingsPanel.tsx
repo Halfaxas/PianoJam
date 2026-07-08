@@ -3,6 +3,7 @@ import { useRoomStore } from "../../state/roomStore";
 import { getSocket } from "../../lib/socket";
 import { getInstrument } from "../../audio/instruments";
 import { toast } from "../../state/toastStore";
+import { Icon } from "../Icon";
 
 const VISIBILITY_OPTIONS: { id: RoomVisibility; label: string; hint: string }[] = [
   { id: "public", label: "Public", hint: "Listed in the room browser, anyone can join." },
@@ -89,6 +90,7 @@ export function RoomSettingsPanel() {
               type="button"
               key={option.id}
               className={`segment${room.visibility === option.id ? " selected" : ""}`}
+              aria-pressed={room.visibility === option.id}
               onClick={() => setVisibility(option.id)}
             >
               {option.label}
@@ -103,46 +105,52 @@ export function RoomSettingsPanel() {
             Regenerating makes previously shared invite links stop working.
           </span>
           <button className="btn ghost small" onClick={regenerateInvite}>
-            ↻ New invite link
+            <Icon name="refresh" size={13} /> New invite link
           </button>
         </div>
       </div>
 
-      <div className="mode-picker-label">Players</div>
-      {others.length === 0 && <div className="hint">No other players in the room yet.</div>}
-      <div className="player-list">
-        {others.map((p) => (
-          <div key={p.id} className="settings-player">
-            <img className="player-avatar" src={`/avatars/${p.avatar}.svg`} alt="" />
-            <div className="settings-player-text">
-              <span className="player-chip-name">{p.name}</span>
-              <span className="player-chip-instrument">
-                {getInstrument(p.instrumentId).label}
-              </span>
+      <div className="mode-picker">
+        <span className="mode-picker-label">Players</span>
+        {others.length === 0 && <div className="hint">No other players in the room yet.</div>}
+        <div className="player-list">
+          {others.map((p) => (
+            <div key={p.id} className="settings-player">
+              <img className="player-avatar" src={`/avatars/${p.avatar}.svg`} alt="" />
+              <div className="settings-player-text">
+                <span className="player-chip-name">{p.name}</span>
+                <span className="player-chip-instrument">
+                  {getInstrument(p.instrumentId).label}
+                </span>
+              </div>
+              <button
+                className={`btn ghost small${p.mutedChat ? " active" : ""}`}
+                aria-pressed={p.mutedChat}
+                title={p.mutedChat ? "Unmute chat" : "Mute chat"}
+                aria-label={p.mutedChat ? `Unmute ${p.name} in chat` : `Mute ${p.name} in chat`}
+                onClick={() => setMute(p.id, !p.mutedChat, p.mutedNotes)}
+              >
+                <Icon name="chat" size={14} />
+              </button>
+              <button
+                className={`btn ghost small${p.mutedNotes ? " active" : ""}`}
+                aria-pressed={p.mutedNotes}
+                title={p.mutedNotes ? "Unmute playing" : "Mute playing"}
+                aria-label={p.mutedNotes ? `Unmute ${p.name}'s playing` : `Mute ${p.name}'s playing`}
+                onClick={() => setMute(p.id, p.mutedChat, !p.mutedNotes)}
+              >
+                <Icon name="piano" size={14} />
+              </button>
+              <button
+                className="btn ghost small kick"
+                title="Kick from the room"
+                onClick={() => getSocket().emit("room:kick", p.id)}
+              >
+                Kick
+              </button>
             </div>
-            <button
-              className={`btn ghost small${p.mutedChat ? " active" : ""}`}
-              title={p.mutedChat ? "Unmute chat" : "Mute chat"}
-              onClick={() => setMute(p.id, !p.mutedChat, p.mutedNotes)}
-            >
-              {p.mutedChat ? "💬🚫" : "💬"}
-            </button>
-            <button
-              className={`btn ghost small${p.mutedNotes ? " active" : ""}`}
-              title={p.mutedNotes ? "Unmute playing" : "Mute playing"}
-              onClick={() => setMute(p.id, p.mutedChat, !p.mutedNotes)}
-            >
-              {p.mutedNotes ? "🎹🚫" : "🎹"}
-            </button>
-            <button
-              className="btn danger small"
-              title="Kick from the room"
-              onClick={() => getSocket().emit("room:kick", p.id)}
-            >
-              Kick
-            </button>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );

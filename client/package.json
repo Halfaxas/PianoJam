@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource/instrument-sans": "^5.2.8",
+    "@fontsource/instrument-serif": "^5.2.8",
     "@pianojam/shared": "*",
     "@tonejs/midi": "^2.0.28",
     "react": "^19.1.0",

@@ -18,20 +18,22 @@ const LAYOUT_BY_MIDI = new Map(LAYOUT.map((k) => [k.midi, k]));
 const NOTE_LABELS = new Map(LAYOUT.map((k) => [k.midi, k.name.replace(/-?\d+$/, "")]));
 
 /** Song Mode colors (theme-independent so they never clash with trails). */
-const SONG_NOTE_COLOR = "#f5c04a";
-const SONG_NOTE_BLACK_COLOR = "#e8931f";
+const SONG_NOTE_COLOR = "#e8b45a";
+const SONG_NOTE_BLACK_COLOR = "#cd8632";
 const GRADE_COLORS: Record<GradeKind, string> = {
-  hit: "#4ade80",
-  early: "#fbbf24",
-  late: "#fbbf24",
-  miss: "#f87171",
+  hit: "#86c07c",
+  early: "#f2d24b",
+  late: "#f2d24b",
+  miss: "#e26a55",
 };
-/** Practice (Wait mode): the note to play pulses blue, a correct hold turns
-    green, finished notes fade out. */
-const WAIT_REQUIRED_COLOR = "#38bdf8";
-const WAIT_REQUIRED_EDGE = "#e0f2fe";
-const WAIT_HELD_COLOR = "#4ade80";
-const WAIT_HELD_EDGE = "#bbf7d0";
+/* Misses render dimmer than hits, but never below 3:1 on the dark stage. */
+const MISS_MIN_ALPHA = 0.75;
+/** Practice (Wait mode): the note to play pulses ice blue, a correct hold
+    turns green, finished notes fade out. */
+const WAIT_REQUIRED_COLOR = "#6fb3dc";
+const WAIT_REQUIRED_EDGE = "#dceefa";
+const WAIT_HELD_COLOR = "#86c07c";
+const WAIT_HELD_EDGE = "#c9e5c3";
 
 /**
  * Draws the trailing notes (rising from the keyboard) and Song Mode's
@@ -93,8 +95,8 @@ export function NoteCanvas() {
       const y = Math.min(bottom, height) - 5;
       if (y - size < top) return;
       ctx.globalAlpha = Math.min(1, alpha + 0.15);
-      ctx.fillStyle = "rgba(8, 12, 18, 0.78)";
-      ctx.font = `600 ${size}px system-ui, sans-serif`;
+      ctx.fillStyle = "rgba(19, 17, 16, 0.78)";
+      ctx.font = `600 ${size}px "Instrument Sans", system-ui, sans-serif`;
       ctx.textAlign = "center";
       ctx.fillText(label, x + w / 2, y);
     };
@@ -151,7 +153,7 @@ export function NoteCanvas() {
             else if (grade === GRADE.early || grade === GRADE.late) color = GRADE_COLORS.early;
             else if (grade === GRADE.miss) {
               color = GRADE_COLORS.miss;
-              alpha = 0.5;
+              alpha = MISS_MIN_ALPHA;
             }
           }
 
@@ -238,7 +240,8 @@ export function NoteCanvas() {
     };
   }, []);
 
-  return <canvas ref={canvasRef} className="note-canvas" />;
+  // Purely visual; SongHud and NoteChordDisplay mirror the state as text.
+  return <canvas ref={canvasRef} className="note-canvas" aria-hidden="true" />;
 }
 
 function roundRect(
