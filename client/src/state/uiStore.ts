@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type PanelId = "sound" | "metronome" | "theme" | "settings" | null;
+export type PanelId = "sound" | "metronome" | "theme" | "settings" | "song" | null;
 
 /**
  * Which room-page panel is open. Lives in a store (not component state) so

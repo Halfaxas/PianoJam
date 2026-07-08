@@ -3,13 +3,19 @@ import { useToastStore } from "../state/toastStore";
 export function Toasts() {
   const toasts = useToastStore((s) => s.toasts);
   const dismiss = useToastStore((s) => s.dismiss);
-  if (toasts.length === 0) return null;
   return (
-    <div className="toasts">
+    // Always mounted so screen readers announce toasts as they arrive.
+    <div className="toasts" role="status" aria-live="polite">
       {toasts.map((t) => (
-        <div key={t.id} className={`toast toast-${t.kind}`} onClick={() => dismiss(t.id)}>
+        <button
+          key={t.id}
+          type="button"
+          className={`toast toast-${t.kind}`}
+          onClick={() => dismiss(t.id)}
+          title="Dismiss"
+        >
           {t.text}
-        </div>
+        </button>
       ))}
     </div>
   );

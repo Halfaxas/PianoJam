@@ -34,6 +34,9 @@ const httpServer = http.createServer(app);
 const io = new Server(httpServer, {
   cors: IS_PROD ? undefined : { origin: true },
   serveClient: false,
+  // Song Mode uploads a parsed note list (up to SONG_LIMITS.maxNotes), which
+  // can exceed the 1MB default.
+  maxHttpBufferSize: 3_000_000,
 });
 
 setupSockets(io);

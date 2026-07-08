@@ -3,6 +3,7 @@ import { computeKeyLayout } from "@pianojam/shared";
 import { pressKey, releaseKey } from "../audio/player";
 import { ensureAudioStarted } from "../audio/engine";
 import { useIsNoteActive } from "../state/activeNotes";
+import { usePracticeKeyState } from "../state/practiceKeys";
 import { useThemeStore } from "../state/themeStore";
 
 const LAYOUT = computeKeyLayout();
@@ -29,16 +30,20 @@ const PianoKey = memo(function PianoKey({
   black,
 }: KeyProps & { black: boolean }) {
   const active = useIsNoteActive(midi);
+  // During practice the verdict color (green/red) replaces the theme tint.
+  const practice = usePracticeKeyState(midi);
   const activeColor = useThemeStore((s) => (black ? s.blackTrail : s.whiteTrail));
 
   return (
     <div
       data-midi={midi}
-      className={`piano-key ${black ? "black" : "white"}${active ? " active" : ""}`}
+      className={`piano-key ${black ? "black" : "white"}${active ? " active" : ""}${
+        practice ? ` practice-${practice}` : ""
+      }`}
       style={{
         left: `${left}%`,
         width: `${width}%`,
-        ...(active ? { background: activeColor } : undefined),
+        ...(active && !practice ? { background: activeColor } : undefined),
       }}
     >
       {label && <span className="key-label">{label}</span>}
@@ -87,6 +92,8 @@ export function Keyboard() {
   return (
     <div
       className="keyboard"
+      role="group"
+      aria-label="Piano keyboard. Play with your mouse, touch, a MIDI device, or your computer keys — press 0-8 to pick the octave, hold Shift for sharps."
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endPointer}

@@ -11,6 +11,10 @@ import {
 import { ensureSampler, loadMyInstrument } from "../audio/engine";
 import { startMetronome, useMetronomeStore } from "../audio/metronome";
 import { useUiStore } from "../state/uiStore";
+import { localMuteOf } from "../state/localMuteStore";
+import { useReactionStore } from "../state/reactionStore";
+import { useSongStore } from "../state/songStore";
+import { applyPlayback, applySongLoaded } from "../song/engine";
 
 export type AppSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -50,6 +54,7 @@ export function getSocket(): AppSocket {
     const store = useRoomStore.getState();
     if (store.status !== "joined") return;
     const modeChanged = store.room?.soundMode !== room.soundMode;
+    const visibilityChanged = store.room?.visibility !== room.visibility;
     store.setRoom(room);
     if (modeChanged) {
       toast.info(
@@ -58,6 +63,48 @@ export function getSocket(): AppSocket {
           : "The admin switched the room to solo instrument: everyone plays the admin's sound pack.",
       );
     }
+    if (visibilityChanged) {
+      toast.info(
+        room.visibility === "public"
+          ? "The admin made this room public: anyone can join."
+          : room.visibility === "private"
+            ? "The admin made this room private: joining now needs the invite link."
+            : "The admin hid this room: it is invite-link-only and unlisted.",
+      );
+    }
+  });
+
+  socket.on("room:invite", ({ inviteToken }) => {
+    useRoomStore.getState().setInviteToken(inviteToken);
+  });
+
+  socket.on("reaction", ({ from, reaction }) => {
+    // Reactions are chatter: respect the local chat mute.
+    if (localMuteOf(from).chat) return;
+    useReactionStore.getState().add(from, reaction);
+  });
+
+  socket.on("song:loaded", ({ song, from }) => {
+    applySongLoaded(song, from);
+    if (from !== useRoomStore.getState().self?.name) {
+      toast.info(`${from} loaded "${song.title}" for the room.`);
+    }
+  });
+
+  socket.on("song:playback", (playback) => {
+    const prev = useSongStore.getState().playback;
+    applyPlayback(playback);
+    if (playback.state === "playing" && prev?.state !== "playing") {
+      toast.info(
+        playback.mode === "keepup"
+          ? "Keep up! Play the falling notes as they reach the keyboard."
+          : "Song playback started. Feel free to play along.",
+      );
+    }
+  });
+
+  socket.on("song:score", ({ from, score }) => {
+    useSongStore.getState().setScore(from, score);
   });
 
   socket.on("room:kicked", ({ reason }) => {
@@ -76,7 +123,10 @@ export function getSocket(): AppSocket {
   socket.on("peer:pedal", ({ down, from }) => remotePedal(down, from));
 
   socket.on("chat:message", (message) => {
-    useRoomStore.getState().addMessage(message);
+    // Locally muted senders' messages are kept (so unmuting restores the
+    // conversation) but hidden by the chat panel and never counted unread.
+    const muted = localMuteOf(message.from).chat;
+    useRoomStore.getState().addMessage(message, !muted);
   });
 
   return socket;

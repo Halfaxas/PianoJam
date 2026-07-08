@@ -8,6 +8,7 @@ import {
 import { useIsAdmin } from "../../state/roomStore";
 import { getSocket } from "../../lib/socket";
 import { toast } from "../../state/toastStore";
+import { Icon } from "../Icon";
 
 export function MetronomePanel() {
   const { bpm, running, beat, setBpm } = useMetronomeStore();
@@ -42,18 +43,18 @@ export function MetronomePanel() {
         aria-label="Tempo"
       />
       <div className="row-between">
-        <button className="btn ghost" onClick={() => setBpm(bpm - 1)}>−1</button>
+        <button className="btn ghost" aria-label="Slow down by 1 BPM" onClick={() => setBpm(bpm - 1)}>−1</button>
         <button
           className={`btn ${running ? "danger" : "primary"}`}
           onClick={() => (running ? stopMetronome() : void startMetronome())}
         >
           {running ? "Stop" : "Start"}
         </button>
-        <button className="btn ghost" onClick={() => setBpm(bpm + 1)}>+1</button>
+        <button className="btn ghost" aria-label="Speed up by 1 BPM" onClick={() => setBpm(bpm + 1)}>+1</button>
       </div>
       {isAdmin && (
         <button className="btn ghost full" onClick={startForEveryone}>
-          👑 Start for everyone
+          <Icon name="crown" size={14} /> Start for everyone
         </button>
       )}
       {isAdmin && (

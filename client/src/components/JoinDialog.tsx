@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AVATARS, randomAvatar, ROOM_LIMITS } from "@pianojam/shared";
 import { getSocket } from "../lib/socket";
 import { randomNickname } from "../lib/names";
 import { useRoomStore } from "../state/roomStore";
 import { getAdminToken, useProfileStore } from "../state/profileStore";
+import { applyServerSongState } from "../song/engine";
 
 interface Props {
   roomId: string;
@@ -17,6 +19,7 @@ interface Props {
  */
 export function JoinDialog({ roomId }: Props) {
   const profile = useProfileStore();
+  const [searchParams] = useSearchParams();
   const [nickname, setNickname] = useState(profile.nickname);
   const [avatar, setAvatar] = useState(randomAvatar());
   const [error, setError] = useState<string | null>(null);
@@ -35,10 +38,19 @@ export function JoinDialog({ roomId }: Props) {
     profile.setAvatar(avatar);
     getSocket().emit(
       "room:join",
-      { roomId, nickname: name, avatar, adminToken: getAdminToken(roomId) },
+      {
+        roomId,
+        nickname: name,
+        avatar,
+        adminToken: getAdminToken(roomId),
+        inviteToken: searchParams.get("invite") ?? undefined,
+      },
       (res) => {
         if (res.ok) {
-          useRoomStore.getState().setJoined(res.data.room, res.data.players, res.data.self);
+          useRoomStore
+            .getState()
+            .setJoined(res.data.room, res.data.players, res.data.self, res.data.inviteToken);
+          applyServerSongState(res.data.song);
           return;
         }
         if (res.code === "NICKNAME_TAKEN" || res.code === "INVALID") {
@@ -54,7 +66,13 @@ export function JoinDialog({ roomId }: Props) {
 
   return (
     <div className="join-backdrop">
-      <form className="card join-dialog" onSubmit={join}>
+      <form
+        className="card join-dialog"
+        onSubmit={join}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Joining room"
+      >
         <h2>Joining room</h2>
         <p className="hint">Pick a nickname and an avatar for this session.</p>
 
@@ -73,6 +91,7 @@ export function JoinDialog({ roomId }: Props) {
             value={nickname}
             maxLength={ROOM_LIMITS.nicknameMax}
             placeholder="e.g. NimbleFingers"
+            aria-label="Nickname"
             onChange={(e) => setNickname(e.target.value)}
             autoFocus
           />
@@ -88,6 +107,7 @@ export function JoinDialog({ roomId }: Props) {
               type="button"
               key={id}
               className={`avatar-option${avatar === id ? " selected" : ""}`}
+              aria-pressed={avatar === id}
               onClick={() => setAvatar(id)}
               title={id}
             >
@@ -97,7 +117,8 @@ export function JoinDialog({ roomId }: Props) {
         </div>
 
         <button className="btn primary full" disabled={busy || !nickname.trim()}>
-          {busy ? "Joining..." : "Join room"}
+          {busy ? "Joining…" : "Join room"}
+          {busy && <span className="spinner" />}
         </button>
       </form>
     </div>

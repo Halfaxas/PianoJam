@@ -6,6 +6,7 @@ import { useUiStore, type PanelId } from "../state/uiStore";
 import { startRecording, stopRecording } from "../audio/recorder";
 import { getInstrument } from "../audio/instruments";
 import { toast } from "../state/toastStore";
+import { Icon } from "./Icon";
 
 interface Props {
   chatVisible: boolean;
@@ -65,10 +66,14 @@ export function TopBar({ chatVisible, toggleChat, onRecordingReady }: Props) {
 
   const shareRoom = async () => {
     if (!room) return;
-    const url = `${window.location.origin}/room/${room.id}`;
+    // Non-public rooms are invite-link-only, so the link must carry the token.
+    const { inviteToken } = useRoomStore.getState();
+    const invite =
+      room.visibility !== "public" && inviteToken ? `?invite=${inviteToken}` : "";
+    const url = `${window.location.origin}/room/${room.id}${invite}`;
     try {
       await navigator.clipboard.writeText(url);
-      toast.success("Room link copied. Send it to a friend!");
+      toast.success("Room link copied. Send it to a friend.");
     } catch {
       toast.error(`Couldn't copy automatically. The link is: ${url}`);
     }
@@ -78,10 +83,10 @@ export function TopBar({ chatVisible, toggleChat, onRecordingReady }: Props) {
     <header className="topbar">
       <div className="topbar-left">
         <button className="btn ghost" onClick={() => navigate("/")}>
-          ← Leave
+          <Icon name="arrow-left" /> Leave
         </button>
         <div className="room-title">
-          <span className="room-name">{room?.name ?? "..."}</span>
+          <span className="room-name">{room?.name ?? "…"}</span>
           {room && (
             <span className="room-id">
               #{room.id} · {room.soundMode === "orchestra" ? "orchestra" : "solo instrument"}
@@ -92,23 +97,28 @@ export function TopBar({ chatVisible, toggleChat, onRecordingReady }: Props) {
 
       <div className="topbar-center">
         <button className="btn ghost" onClick={() => toggle("sound")}>
-          🎹 {getInstrument(instrumentId).label}
+          <Icon name="piano" /> {getInstrument(instrumentId).label}
           {instrumentLoading && <span className="spinner" />}
         </button>
         <button className="btn ghost" onClick={() => toggle("metronome")}>
-          Metronome
+          <Icon name="metronome" /> Metronome
+        </button>
+        <button className="btn ghost" onClick={() => toggle("song")}>
+          <Icon name="music" /> Song
         </button>
         <button className="btn ghost" onClick={() => toggle("theme")}>
-          Colors
+          <Icon name="palette" /> Colors
         </button>
         {isAdmin && (
           <button className="btn ghost" onClick={() => toggle("settings")}>
-            ⚙ Settings
+            <Icon name="sliders" /> Settings
           </button>
         )}
         <button
           className={`btn ${recording ? "danger" : "ghost"}`}
           onClick={onRecordClick}
+          aria-pressed={recording}
+          aria-label={recording ? "Stop and save recording" : "Record audio"}
           title={recording ? "Stop and save recording" : "Record audio"}
         >
           <span className={`rec-dot${recording ? " live" : ""}`} />
@@ -126,7 +136,7 @@ export function TopBar({ chatVisible, toggleChat, onRecordingReady }: Props) {
           }
         >
           <button className="btn ghost" onClick={shareRoom} disabled={roomFull}>
-            🔗 Share
+            <Icon name="link" /> Share
           </button>
         </span>
         <span
@@ -137,6 +147,11 @@ export function TopBar({ chatVisible, toggleChat, onRecordingReady }: Props) {
         </span>
         <span
           className={`status-chip${midiDevices.length > 0 ? " ok" : ""}`}
+          aria-label={
+            midiDevices.length > 0
+              ? `MIDI connected: ${midiDevices.join(", ")}`
+              : "No MIDI device detected"
+          }
           title={
             midiDevices.length > 0
               ? `MIDI connected: ${midiDevices.join(", ")}`
@@ -145,9 +160,13 @@ export function TopBar({ chatVisible, toggleChat, onRecordingReady }: Props) {
         >
           MIDI
         </span>
-        {pedalDown && <span className="status-chip ok">Pedal</span>}
+        {pedalDown && <span className="status-chip">Pedal</span>}
         {room?.chatEnabled && (
-          <button className={`btn ${chatVisible ? "primary" : "ghost"}`} onClick={toggleChat}>
+          <button
+            className={`btn ghost${chatVisible ? " selected" : ""}`}
+            onClick={toggleChat}
+            aria-pressed={chatVisible}
+          >
             Chat{unread > 0 && <span className="badge">{unread}</span>}
           </button>
         )}

@@ -2,21 +2,44 @@ import type { Server, Socket } from "socket.io";
 import type {
   ClientToServerEvents,
   Player,
+  RoomSongState,
   ServerToClientEvents,
 } from "@pianojam/shared";
-import { isValidAvatar, isValidMidi, randomAvatar, ROOM_LIMITS } from "@pianojam/shared";
-import { RoomManager } from "./rooms";
+import {
+  isValidAvatar,
+  isValidMidi,
+  isValidReaction,
+  isValidVisibility,
+  randomAvatar,
+  REACTION_COOLDOWN_MS,
+  ROOM_LIMITS,
+  sanitizeSongData,
+  sanitizeSongScore,
+} from "@pianojam/shared";
+import { RoomManager, type Room } from "./rooms";
 import { censorProfanity, containsLink, hasProfanity } from "./profanity";
 
 interface SocketData {
   roomId: string | null;
   player: Player | null;
+  /** Rate limiting: last accepted reaction / score report (ms). */
+  lastReactionAt: number;
+  lastScoreAt: number;
 }
 
 type IoServer = Server<ClientToServerEvents, ServerToClientEvents, {}, SocketData>;
 type IoSocket = Socket<ClientToServerEvents, ServerToClientEvents, {}, SocketData>;
 
 const rooms = new RoomManager();
+
+function songStateOf(room: Room): RoomSongState | null {
+  if (!room.song) return null;
+  return {
+    data: room.song,
+    playback: rooms.songPlaybackNow(room),
+    scores: Object.fromEntries(room.songScores),
+  };
+}
 
 const KNOWN_INSTRUMENTS = new Set([
   "piano", "salamander", "harp", "organ", "harmonium", "violin", "cello",
@@ -41,6 +64,8 @@ export function setupSockets(io: IoServer): void {
   io.on("connection", (socket: IoSocket) => {
     socket.data.roomId = null;
     socket.data.player = null;
+    socket.data.lastReactionAt = 0;
+    socket.data.lastScoreAt = 0;
 
     const broadcastPlayers = (roomId: string) => {
       const room = rooms.get(roomId);
@@ -59,16 +84,28 @@ export function setupSockets(io: IoServer): void {
 
     socket.on("room:create", (input, ack) => {
       if (typeof ack !== "function") return;
+      const name = String(input?.name ?? "");
+      if (hasProfanity(name)) {
+        return ack({ ok: false, error: "That room name is not allowed. Please pick a friendlier one." });
+      }
+      if (containsLink(name)) {
+        return ack({ ok: false, error: "Links are not allowed in room names." });
+      }
       const result = rooms.create({
-        name: String(input?.name ?? ""),
+        name,
         maxPlayers: Number(input?.maxPlayers),
         chatEnabled: Boolean(input?.chatEnabled),
         soundMode: input?.soundMode === "orchestra" ? "orchestra" : "admin",
+        visibility: isValidVisibility(input?.visibility) ? input.visibility : "public",
       });
       if (typeof result === "string") return ack({ ok: false, error: result });
       ack({
         ok: true,
-        data: { room: rooms.summarize(result), adminToken: result.adminToken },
+        data: {
+          room: rooms.summarize(result),
+          adminToken: result.adminToken,
+          inviteToken: result.inviteToken,
+        },
       });
     });
 
@@ -108,6 +145,7 @@ export function setupSockets(io: IoServer): void {
         socket.id,
         { nickname, avatar },
         typeof input?.adminToken === "string" ? input.adminToken : undefined,
+        typeof input?.inviteToken === "string" ? input.inviteToken : undefined,
       );
       if (!result.ok) {
         return ack({ ok: false, error: result.error, code: result.code });
@@ -126,6 +164,8 @@ export function setupSockets(io: IoServer): void {
           room: rooms.summarize(room),
           players: [...room.players.values()],
           self: player,
+          inviteToken: room.inviteToken,
+          song: songStateOf(room),
         },
       });
       broadcastPlayers(room.id);
@@ -239,6 +279,73 @@ export function setupSockets(io: IoServer): void {
         io.to(roomId).emit("room:instrument", { instrumentId: change.room.instrumentId });
       }
       broadcastPlayers(roomId);
+    });
+
+    socket.on("room:setVisibility", (visibility) => {
+      const roomId = socket.data.roomId;
+      if (!roomId || !isValidVisibility(visibility)) return;
+      const room = rooms.setVisibility(roomId, socket.id, visibility);
+      if (room) io.to(roomId).emit("room:update", rooms.summarize(room));
+    });
+
+    socket.on("room:regenerateInvite", (ack) => {
+      const roomId = socket.data.roomId;
+      if (!roomId || typeof ack !== "function") return;
+      const inviteToken = rooms.regenerateInvite(roomId, socket.id);
+      if (!inviteToken) {
+        return ack({ ok: false, error: "Only the room admin can regenerate the invite link." });
+      }
+      // Everyone in the room shares from the same, current link.
+      io.to(roomId).emit("room:invite", { inviteToken });
+      ack({ ok: true, data: { inviteToken } });
+    });
+
+    socket.on("reaction:send", (reaction) => {
+      const roomId = socket.data.roomId;
+      const player = socket.data.player;
+      if (!roomId || !player || !isValidReaction(reaction)) return;
+      const now = Date.now();
+      if (now - socket.data.lastReactionAt < REACTION_COOLDOWN_MS) return;
+      socket.data.lastReactionAt = now;
+      io.to(roomId).emit("reaction", { from: player.name, reaction });
+    });
+
+    socket.on("song:load", (rawSong, ack) => {
+      if (typeof ack !== "function") return;
+      const roomId = socket.data.roomId;
+      const player = socket.data.player;
+      if (!roomId || !player?.isAdmin) {
+        return ack({ ok: false, error: "Only the room admin can load a song." });
+      }
+      const song = sanitizeSongData(rawSong);
+      if (!song) {
+        return ack({ ok: false, error: "That file doesn't look like a playable MIDI song." });
+      }
+      const room = rooms.loadSong(roomId, socket.id, song);
+      if (!room) return ack({ ok: false, error: "Loading the song failed." });
+      ack({ ok: true, data: null });
+      io.to(roomId).emit("song:loaded", { song, from: player.name });
+      io.to(roomId).emit("song:playback", rooms.songPlaybackNow(room));
+    });
+
+    socket.on("song:control", (control) => {
+      const roomId = socket.data.roomId;
+      if (!roomId || typeof control !== "object" || control === null) return;
+      const room = rooms.controlSong(roomId, socket.id, control);
+      if (room) io.to(roomId).emit("song:playback", rooms.songPlaybackNow(room));
+    });
+
+    socket.on("song:score", (rawScore) => {
+      const roomId = socket.data.roomId;
+      if (!roomId) return;
+      const now = Date.now();
+      if (now - socket.data.lastScoreAt < 250) return;
+      const score = sanitizeSongScore(rawScore);
+      if (!score) return;
+      const player = rooms.setSongScore(roomId, socket.id, score);
+      if (!player) return;
+      socket.data.lastScoreAt = now;
+      socket.to(roomId).emit("song:score", { from: player.name, score });
     });
 
     socket.on("disconnect", leaveCurrentRoom);

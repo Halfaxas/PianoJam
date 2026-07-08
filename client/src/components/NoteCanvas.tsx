@@ -1,14 +1,45 @@
 import { useEffect, useRef } from "react";
-import { computeKeyLayout } from "@pianojam/shared";
+import { computeKeyLayout, type SongNote } from "@pianojam/shared";
 import { getTrails, TRAIL_SPEED } from "../audio/trails";
+import { useDisplayStore } from "../state/displayStore";
+import {
+  FLASH_SEC,
+  getGradeFlashes,
+  getSongView,
+  GRADE,
+  WAIT_STATE,
+  type GradeKind,
+  type SongView,
+} from "../song/engine";
 
 const LAYOUT = computeKeyLayout();
 const LAYOUT_BY_MIDI = new Map(LAYOUT.map((k) => [k.midi, k]));
+/** Pitch-class labels ("C", "F#") for the optional on-note names. */
+const NOTE_LABELS = new Map(LAYOUT.map((k) => [k.midi, k.name.replace(/-?\d+$/, "")]));
+
+/** Song Mode colors (theme-independent so they never clash with trails). */
+const SONG_NOTE_COLOR = "#e8b45a";
+const SONG_NOTE_BLACK_COLOR = "#cd8632";
+const GRADE_COLORS: Record<GradeKind, string> = {
+  hit: "#86c07c",
+  early: "#f2d24b",
+  late: "#f2d24b",
+  miss: "#e26a55",
+};
+/* Misses render dimmer than hits, but never below 3:1 on the dark stage. */
+const MISS_MIN_ALPHA = 0.75;
+/** Practice (Wait mode): the note to play pulses ice blue, a correct hold
+    turns green, finished notes fade out. */
+const WAIT_REQUIRED_COLOR = "#6fb3dc";
+const WAIT_REQUIRED_EDGE = "#dceefa";
+const WAIT_HELD_COLOR = "#86c07c";
+const WAIT_HELD_EDGE = "#c9e5c3";
 
 /**
- * Draws the trailing notes on a single canvas inside one
+ * Draws the trailing notes (rising from the keyboard) and Song Mode's
+ * falling notes (dropping toward it) on a single canvas inside one
  * requestAnimationFrame loop. No React re-renders happen while playing -
- * the loop pulls trail data straight from the shared mutable model.
+ * the loop pulls its data straight from the shared mutable models.
  */
 export function NoteCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -37,12 +68,148 @@ export function NoteCanvas() {
     observer.observe(canvas);
     resize();
 
+    /** First index with note.time >= t (song notes are sorted by time). */
+    const lowerBound = (notes: readonly SongNote[], t: number): number => {
+      let lo = 0;
+      let hi = notes.length;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (notes[mid]!.time < t) lo = mid + 1;
+        else hi = mid;
+      }
+      return lo;
+    };
+
+    /** Pitch-class name drawn near a note's leading edge, if it fits. */
+    const drawLabel = (
+      midi: number,
+      x: number,
+      w: number,
+      top: number,
+      bottom: number,
+      alpha: number,
+    ) => {
+      const label = NOTE_LABELS.get(midi);
+      if (!label || w < 10) return;
+      const size = Math.max(8, Math.min(11, w * 0.55));
+      const y = Math.min(bottom, height) - 5;
+      if (y - size < top) return;
+      ctx.globalAlpha = Math.min(1, alpha + 0.15);
+      ctx.fillStyle = "rgba(19, 17, 16, 0.78)";
+      ctx.font = `600 ${size}px "Instrument Sans", system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.fillText(label, x + w / 2, y);
+    };
+
+    const drawSong = (nowSec: number, view: SongView | null, labels: boolean) => {
+      if (view) {
+        // Screen distance reflects real time until impact, so tempo
+        // changes stretch the note field accordingly.
+        const pxPerSec = TRAIL_SPEED / view.rate;
+        const lookahead = height / pxPerSec + 1;
+        const notes = view.notes;
+        const pulse = 0.55 + 0.45 * Math.sin(nowSec * 6);
+
+        // Start early enough to catch long notes still crossing the line.
+        for (let i = lowerBound(notes, view.pos - 32); i < notes.length; i++) {
+          const note = notes[i]!;
+          if (note.time > view.pos + lookahead) break;
+          const midi = note.midi + view.transpose;
+          const key = LAYOUT_BY_MIDI.get(midi);
+          if (!key) continue;
+
+          const bottom = height - (note.time - view.pos) * pxPerSec;
+          const length = Math.max(8, (note.duration / view.rate) * TRAIL_SPEED);
+          const top = bottom - length;
+          if (bottom < 0 || top > height) continue;
+
+          let color =
+            key.color === "black" ? SONG_NOTE_BLACK_COLOR : SONG_NOTE_COLOR;
+          let alpha = 0.85;
+          let edge: string | null = null;
+          let edgeAlpha = 0;
+          if (view.waitStates) {
+            // Practice: the playhead paints each note's live state.
+            const ws = view.waitStates[i]!;
+            if (ws === WAIT_STATE.done) {
+              color = WAIT_HELD_COLOR;
+              alpha = 0.22;
+            } else if (ws === WAIT_STATE.held) {
+              color = WAIT_HELD_COLOR;
+              alpha = 0.95;
+              edge = WAIT_HELD_EDGE;
+              edgeAlpha = 0.9;
+            } else if (ws === WAIT_STATE.required) {
+              color = WAIT_REQUIRED_COLOR;
+              alpha = 0.5 + 0.35 * pulse;
+              edge = WAIT_REQUIRED_EDGE;
+              edgeAlpha = pulse;
+            } else {
+              alpha = 0.55; // upcoming notes recede so the live ones pop
+            }
+          } else {
+            const grade = view.grades?.[i] ?? GRADE.none;
+            if (grade === GRADE.hit) color = GRADE_COLORS.hit;
+            else if (grade === GRADE.early || grade === GRADE.late) color = GRADE_COLORS.early;
+            else if (grade === GRADE.miss) {
+              color = GRADE_COLORS.miss;
+              alpha = MISS_MIN_ALPHA;
+            }
+          }
+
+          const x = (key.left / 100) * width;
+          const w = (key.width / 100) * width;
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = color;
+          roundRect(ctx, x + w * 0.12, top, w * 0.76, length, Math.min(5, w * 0.3));
+          ctx.fill();
+
+          if (edge) {
+            ctx.globalAlpha = edgeAlpha;
+            ctx.strokeStyle = edge;
+            ctx.lineWidth = 2;
+            roundRect(ctx, x + w * 0.12, top, w * 0.76, length, Math.min(5, w * 0.3));
+            ctx.stroke();
+          }
+
+          if (labels) drawLabel(midi, x, w, top, bottom, alpha);
+        }
+      }
+
+      // Hit/miss feedback flashes above the keyboard line.
+      for (const f of getGradeFlashes()) {
+        const key = LAYOUT_BY_MIDI.get(f.midi);
+        if (!key) continue;
+        const life = 1 - (nowSec - f.at) / FLASH_SEC;
+        if (life <= 0) continue;
+        const x = (key.left / 100) * width;
+        const w = (key.width / 100) * width;
+        ctx.globalAlpha = 0.55 * life;
+        ctx.fillStyle = GRADE_COLORS[f.kind];
+        roundRect(ctx, x + w * 0.06, height - 26, w * 0.88, 26, 5);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    };
+
     const draw = () => {
       raf = requestAnimationFrame(draw);
       ctx.clearRect(0, 0, width, height);
       const now = performance.now() / 1000;
 
-      for (const trail of getTrails(height)) {
+      const view = getSongView();
+      const labels = useDisplayStore.getState().noteLabels;
+      drawSong(now, view, labels);
+
+      // Any active song session hides the rising trails: they visually
+      // clash with the falling notes. getTrails still runs so finished
+      // trails keep getting pruned.
+      const trails = getTrails(height);
+      if (view) {
+        ctx.globalAlpha = 1;
+        return;
+      }
+      for (const trail of trails) {
         const key = LAYOUT_BY_MIDI.get(trail.midi);
         if (!key) continue;
 
@@ -55,10 +222,13 @@ export function NoteCanvas() {
         const top = bottom - trailHeight;
         if (bottom < 0 || top > height) continue;
 
-        ctx.globalAlpha = trail.remote ? 0.55 : 0.9;
+        const alpha = trail.remote ? 0.55 : 0.9;
+        ctx.globalAlpha = alpha;
         ctx.fillStyle = trail.color;
         roundRect(ctx, x + w * 0.08, top, w * 0.84, trailHeight, Math.min(6, w * 0.3));
         ctx.fill();
+
+        if (labels) drawLabel(trail.midi, x, w, top, bottom, alpha);
       }
       ctx.globalAlpha = 1;
     };
@@ -70,7 +240,8 @@ export function NoteCanvas() {
     };
   }, []);
 
-  return <canvas ref={canvasRef} className="note-canvas" />;
+  // Purely visual; SongHud and NoteChordDisplay mirror the state as text.
+  return <canvas ref={canvasRef} className="note-canvas" aria-hidden="true" />;
 }
 
 function roundRect(
