@@ -62,7 +62,10 @@ tab (pick a different nickname) to hear the multiplayer sync.
 
 The app is deployed as two pieces, both free:
 
-- **Client** → [Cloudflare Pages](https://pages.cloudflare.com) (static `client/dist`)
+- **Client** → [Cloudflare Pages](https://pages.cloudflare.com) (static `client/dist`; a root
+  `wrangler.jsonc` configures the asset directory + SPA fallback for Cloudflare's unified
+  Workers & Pages "Import a repository" flow, which no longer shows separate build/output
+  fields when it finds one)
 - **Server** → [Render](https://render.com) free web service (Express + Socket.IO needs a
   long-running process, which Cloudflare's free tier doesn't offer; see `render.yaml`)
 

@@ -1,0 +1,8 @@
+{
+  "name": "pianojam-client",
+  "compatibility_date": "2026-08-04",
+  "assets": {
+    "directory": "./client/dist",
+    "not_found_handling": "single-page-application"
+  }
+}
