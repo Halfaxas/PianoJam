@@ -23,7 +23,9 @@ let socket: AppSocket | null = null;
 export function getSocket(): AppSocket {
   if (socket) return socket;
 
-  socket = io();
+  // Same origin in local dev (Vite proxies /socket.io); in production the
+  // client (Cloudflare Pages) and server (e.g. Render) are separate origins.
+  socket = io(import.meta.env.VITE_SERVER_URL || undefined);
 
   socket.on("room:players", (players) => {
     const store = useRoomStore.getState();

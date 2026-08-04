@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: pianojam-server
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm run start -w server
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CLIENT_ORIGIN
+        sync: false

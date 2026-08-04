@@ -60,20 +60,34 @@ tab (pick a different nickname) to hear the multiplayer sync.
 
 ## Production
 
+The app is deployed as two pieces, both free:
+
+- **Client** → [Cloudflare Pages](https://pages.cloudflare.com) (static `client/dist`)
+- **Server** → [Render](https://render.com) free web service (Express + Socket.IO needs a
+  long-running process, which Cloudflare's free tier doesn't offer; see `render.yaml`)
+
 ```bash
 npm run build    # builds client/dist
-npm start        # serves API + built client on :5000
+npm start        # serves API + Socket.IO on :5000 (and the built client, for local/single-host use)
 ```
 
-The server serves the built client itself, so a single process (one container / VM) runs the
-whole app. `PORT` is the only environment variable (default `5000`, see `server/.env.example`).
+Environment variables:
+
+- Server: `PORT` (default `5000`), `CLIENT_ORIGIN` — comma-separated list of allowed client
+  origins in production, e.g. `https://pianojam.pages.dev` (see `server/.env.example`).
+- Client: `VITE_SERVER_URL` — the server's URL, e.g. `https://pianojam-server.onrender.com`.
+  Leave unset for local dev or any single-origin deploy (see `client/.env.example`).
 
 Deployment notes:
 
-- Any Node host works (Fly.io, Railway, Render, a VPS...).
+- The server still serves the built client itself if `client/dist` exists (single-host mode
+  still works for a VPS or any other Node host), but the Cloudflare/Render split runs them as
+  separate origins, hence `CLIENT_ORIGIN` / `VITE_SERVER_URL`.
 - WebSockets must be allowed by your proxy/host (Socket.IO falls back to polling otherwise).
 - Rooms are intentionally ephemeral: they live in server memory and close about a minute
   after the last player leaves.
+- Render's free tier spins the server down after inactivity; the first connection after a
+  quiet period takes ~30-50s to wake it back up.
 
 ## Project structure
 

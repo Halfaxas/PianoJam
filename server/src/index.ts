@@ -5,16 +5,17 @@ import express from "express";
 import cors from "cors";
 import { Server } from "socket.io";
 import { setupSockets } from "./sockets";
-import { CLIENT_DIST, IS_PROD, PORT } from "./config";
+import { CLIENT_DIST, CLIENT_ORIGINS, IS_PROD, PORT } from "./config";
 
 const app = express();
 app.disable("x-powered-by");
 
 // In development the Vite dev server proxies to us, but allow direct
-// cross-origin calls too (e.g. client on :3000, server on :5000).
-if (!IS_PROD) {
-  app.use(cors());
-}
+// cross-origin calls too (e.g. client on :3000, server on :5000). In
+// production the client is a separate origin (e.g. Cloudflare Pages), so
+// allow whatever's listed in CLIENT_ORIGIN.
+const corsOptions = IS_PROD ? { origin: CLIENT_ORIGINS } : { origin: true };
+app.use(cors(corsOptions));
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
@@ -32,7 +33,7 @@ if (fs.existsSync(CLIENT_DIST)) {
 const httpServer = http.createServer(app);
 
 const io = new Server(httpServer, {
-  cors: IS_PROD ? undefined : { origin: true },
+  cors: corsOptions,
   serveClient: false,
   // Song Mode uploads a parsed note list (up to SONG_LIMITS.maxNotes), which
   // can exceed the 1MB default.
